@@ -1,0 +1,16 @@
+{
+  "luci-app-nova-dashboard": {
+    "description": "Read-only access for Nova status overview",
+    "read": {
+      "ubus": {
+        "system": [
+          "board",
+          "info"
+        ],
+        "network.interface": [
+          "dump"
+        ]
+      }
+    }
+  }
+}

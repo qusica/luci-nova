@@ -1,0 +1,4 @@
+LuCI Nova carries adapted template files originally developed for the
+OpenWrt LuCI Bootstrap theme (openwrt/luci, Apache License 2.0).
+Their original copyright and license headers are preserved in the template files.
+The remaining project-authored files are licensed under the MIT license.

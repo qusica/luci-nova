@@ -1,0 +1,172 @@
+/* Nova alpha: Bootstrap-derived layout with dark, glassy panels and lime accents. */
+:root,
+:root[data-darkmode="true"] {
+  --background-color-h: 225;
+  --background-color-s: 12%;
+  --background-color-l: 6%;
+  --background-color-delta-l-sign: 1;
+  --text-color-h: 220;
+  --text-color-s: 13%;
+  --text-color-l: 95%;
+  --text-color-delta-l-sign: -1;
+  --border-color-h: 220;
+  --border-color-s: 12%;
+  --border-color-l: 22%;
+  --border-color-delta-l-sign: 1;
+  --primary-color-high: #b9eb2e;
+  --primary-color-medium: #a5d522;
+  --primary-color-low: #88b61d;
+  --on-primary-color: #10140b;
+  --background-color-high: #0b0d10;
+  --background-color-medium: #121419;
+  --background-color-low: #16191e;
+  --border-color-low: #262b33;
+  --text-color-high: #eef0f3;
+  --text-color-medium: #aab0bc;
+  --text-color-low: #858c99;
+  color-scheme: dark;
+}
+html,body { min-height:100%; }
+body {
+  padding:0;
+  background:#0b0d10;
+  color:#e5e8ed;
+  font-family:Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+a { color:#b9eb2e; }
+a:hover { color:#d0f57b; }
+header {
+  position:fixed;
+  z-index:100;
+  width:232px;
+  height:100vh;
+  overflow-y:auto;
+  top:0;
+  left:0;
+  display:flex;
+  flex-direction:column;
+  padding:8px 8px 22px;
+  border-right:1px solid #25282e;
+  background:#101114;
+  box-shadow:none;
+}
+header .brand {
+  display:flex;
+  align-items:center;
+  gap:12px;
+  padding:14px 12px;
+  margin:0 0 20px;
+  text-decoration:none;
+  font-size:16px;
+  font-weight:750;
+  color:#f5f6f8;
+  letter-spacing:.1px;
+}
+.nova-brand-mark {
+  display:grid;
+  place-items:center;
+  width:35px;
+  height:35px;
+  border-radius:9px;
+  color:#c2f23f;
+  border:1px solid #363c41;
+  background:#171a20;
+  font-size:22px;
+  font-weight:800;
+}
+.nova-hostname {display:none;}
+#topmenu {
+  display:flex !important;
+  flex-direction:column;
+  gap:5px;
+  float:none;
+  margin:0;
+  padding:0;
+  width:100%;
+  background:transparent;
+}
+#topmenu>li {display:block; width:100%; float:none; margin:0;}
+#topmenu>li>a {
+  display:block;
+  border-radius:8px;
+  min-height:40px;
+  padding:10px 13px;
+  color:#aab0bb;
+  text-decoration:none;
+  transition:background .18s ease,color .18s ease;
+}
+#topmenu>li>a:hover,
+#topmenu>li.active>a,
+#topmenu>li.dropdown.open>a {
+  color:#ccfa54;
+  background:#252d19;
+}
+#topmenu .dropdown-menu {
+  position:static;
+  float:none;
+  margin:2px 0 6px;
+  padding:4px 0 4px 12px;
+  box-shadow:none;
+  border:0;
+  background:transparent;
+  min-width:unset;
+}
+#topmenu .dropdown-menu a {color:#b8bdc6; border-radius:6px;}
+#topmenu .dropdown-menu a:hover {color:#c5ee48;background:#232b18;}
+#indicators {position:fixed;top:11px;right:22px;z-index:101;color:#acb1bd;}
+#maincontent.container {
+  width:auto;
+  max-width:none;
+  margin:0 0 0 232px;
+  padding:72px 26px 30px;
+  flex:1;
+  min-height:100vh;
+}
+#tabmenu {
+  border:1px solid #292d35;
+  border-radius:10px;
+  background:#14171b;
+  padding:6px;
+}
+.cbi-map,.cbi-section,.panel,.modal,.table {
+  border:1px solid #282d35;
+  background:#14161b;
+  border-radius:10px;
+}
+.cbi-section {padding:12px;}
+h1,h2,h3,h4,h5,.cbi-section legend {color:#eef0f3;}
+.cbi-map .cbi-map-descr,.cbi-section-descr {color:#a8afb9;}
+input,select,textarea,.cbi-dropdown:not(.btn):not(.cbi-button) {
+  background:#191c22 !important;
+  color:#e5e9ee !important;
+  border:1px solid #383d47 !important;
+  border-radius:7px !important;
+}
+.btn,.cbi-button,button {
+  border-radius:7px;
+}
+.btn.primary,.cbi-button-positive,.cbi-button-apply {
+  background:#b9eb2e !important;
+  border-color:#a6d422 !important;
+  color:#121809 !important;
+}
+footer {
+  margin:0 0 0 232px;
+  padding:14px 26px;
+  color:#838994;
+  border-top:1px solid #232830;
+  background:#0e1013;
+}
+footer a {color:#a3ba62;}
+@media(max-width:900px) {
+  header {position:relative;width:100%;height:auto;max-height:none;border-right:0;border-bottom:1px solid #292d35;}
+  header .brand {margin-bottom:0;}
+  #topmenu {flex-direction:row; flex-wrap:wrap;}
+  #topmenu>li {width:auto;}
+  #maincontent.container {margin:0;padding:24px 14px;}
+  #indicators {position:static;}
+  footer {margin:0;padding:12px 14px;}
+}
+@media(prefers-reduced-motion:reduce) {
+  #topmenu>li>a {transition:none;}
+}

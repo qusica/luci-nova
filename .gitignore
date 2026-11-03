@@ -1,0 +1,5 @@
+*.ipk
+*.apk
+bin/
+logs/
+.DS_Store

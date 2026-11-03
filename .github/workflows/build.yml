@@ -1,0 +1,43 @@
+name: Build IPK and APK
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  packages:
+    name: ${{ matrix.series }} / ${{ matrix.arch }} / ${{ matrix.ext }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - series: '24.10'
+            sdk: '24.10.8'
+            arch: 'x86_64'
+            ext: ipk
+          - series: '25.12'
+            sdk: '25.12.6'
+            arch: 'x86_64'
+            ext: apk
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Build from matching OpenWrt SDK
+        uses: openwrt/gh-action-sdk@main
+        env:
+          ARCH: ${{ matrix.arch }}-${{ matrix.sdk }}
+          FEEDNAME: nova
+          PACKAGES: luci-theme-nova luci-app-nova-dashboard
+          BUILD_LOG: 1
+      - name: Upload built ${{ matrix.ext }} packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: luci-nova-${{ matrix.series }}-${{ matrix.ext }}
+          path: bin/packages/**/*.${{ matrix.ext }}
+          if-no-files-found: error

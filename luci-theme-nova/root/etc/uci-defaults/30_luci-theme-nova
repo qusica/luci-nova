@@ -1,0 +1,7 @@
+#!/bin/sh
+# Register Nova as an available theme without taking over the user's current theme.
+if ! uci -q get luci.themes.Nova >/dev/null 2>&1; then
+    uci set luci.themes.Nova='/luci-static/nova'
+    uci commit luci
+fi
+exit 0
