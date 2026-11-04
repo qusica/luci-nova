@@ -3,7 +3,7 @@ include $(TOPDIR)/rules.mk
 LUCI_TITLE:=Nova Dark LuCI Theme
 LUCI_DEPENDS:=+luci-base +luci-theme-bootstrap
 PKG_LICENSE:=MIT AND Apache-2.0
-PKG_VERSION:=0.1.0
+PKG_VERSION:=0.2.0
 PKG_RELEASE:=1
 
 define Package/luci-theme-nova/postrm

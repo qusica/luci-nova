@@ -49,7 +49,7 @@
 	<body class="lang_{{ dispatcher.lang }}" data-page="{{ entityencode(join('-', length(ctx.request_path) ? ctx.request_path : ctx.path), true) }}">
 		{% if (!blank_page): %}
 		<header>
-			<a class="brand" href="{{ dispatcher.build_url("admin") }}"><span class="nova-brand-mark">N</span><span class="nova-brand-name">Nova</span></a><span class="nova-hostname">{{ striptags(boardinfo.hostname ?? '?') }}</span>
+			<a class="brand" href="{{ dispatcher.build_url("admin/nova") }}"><span class="nova-brand-mark">N</span><span class="nova-brand-name">Nova</span></a><span class="nova-hostname">{{ striptags(boardinfo.hostname ?? '?') }}</span>
 			<ul class="nav" id="topmenu" style="display:none"></ul>
 			<div class="nova-sidebar-foot"><span class="nova-footer-dot">●</span> Nova for OpenWrt</div>
 		</header>

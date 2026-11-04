@@ -1,4 +1,17 @@
 {
+  "admin/nova": {
+    "title": "仪表盘",
+    "order": -100,
+    "action": {
+      "type": "view",
+      "path": "nova/dashboard"
+    },
+    "depends": {
+      "acl": [
+        "luci-app-nova-dashboard"
+      ]
+    }
+  },
   "admin/status/nova": {
     "title": "Nova Dashboard",
     "order": 5,

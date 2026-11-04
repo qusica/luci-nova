@@ -2,12 +2,12 @@
 
 Nova is a dark LuCI theme and a companion status dashboard for OpenWrt and ImmortalWrt.
 
-> Early development: source and CI scaffolding are being established. Do not replace the stock LuCI theme on a remote-only router until it has been tested on your firmware.
+> Preview 0.2.0: screenshot-inspired layout, live status metrics and dual package formats. This is still experimental and has not been tested on every router or firmware. Keep Bootstrap installed for safe rollback.
 
 ## Packages
 
 - `luci-theme-nova` — dark visual theme, with Bootstrap as its supported base.
-- `luci-app-nova-dashboard` — independent LuCI status view under **Status → Nova Dashboard**.
+- `luci-app-nova-dashboard` — independent LuCI dashboard under **Dashboard / 仪表盘** (also available via **Status → Nova Dashboard**).
 
 ## IPK and APK builds
 
@@ -74,3 +74,25 @@ The output suffix (`.ipk` or `.apk`) is decided by the SDK. Prefer official vers
 ## License
 
 Project-authored files: MIT. Templates adapted from the LuCI Bootstrap theme retain their upstream Apache-2.0 notices.
+
+## What's new in 0.2.0
+
+- Vantage-inspired 232px fixed sidebar, 51px toolbar, menu search and refresh.
+- Six compact status metrics, CPU utilization sampled from `/proc/stat`, memory and rootfs stats from `system.info`.
+- Branching WAN-router-wireless/LAN map. Click a node to see details or open the relevant LuCI configuration.
+- Realtime WAN and selected Wi-Fi interface traffic drawn from `luci.getRealtimeStats`, when available.
+- Wi-Fi radio channel, noise, transmit power and station counts queried through the built-in LuCI network layer.
+- **No placeholder/random telemetry.** Unavailable data is shown as unavailable, not invented.
+- For custom deployments, WLAN rate reporting depends on driver and rpcd access. Network client grouping reflects associated Wi-Fi stations; wired host count is not inferred from unreliable ARP data.
+
+### Updating an existing installation
+
+Make sure to download the fresh 0.2.0 packages from a **successful** CI run.
+Install both packages again using your device's normal package-manager update/upgrade procedure,
+and reload the browser without cached assets. SSH rollback remains available above.
+
+### Current limitations
+
+- Vantage is an independent UI; Nova uses LuCI's default menu and forms under the hood.
+- A full port-level Ethernet client topology and live spectrum-quality indicators are not yet implemented.
+- Live traffic sampling may be unavailable on some devices or locked-down accounts.
