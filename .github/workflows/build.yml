@@ -28,6 +28,10 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - name: Check JavaScript syntax
+        run: |
+          node --check luci-app-nova-dashboard/htdocs/luci-static/resources/view/nova/dashboard.js
+          node --check luci-theme-nova/htdocs/luci-static/nova/nova-shell.js
       - name: Build from matching OpenWrt SDK
         uses: openwrt/gh-action-sdk@main
         env:
@@ -39,5 +43,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: luci-nova-${{ matrix.series }}-${{ matrix.ext }}
-          path: bin/packages/**/*.${{ matrix.ext }}
+          path: |
+            bin/packages/**/luci-theme-nova-*.${{ matrix.ext }}
+            bin/packages/**/luci-app-nova-dashboard-*.${{ matrix.ext }}
           if-no-files-found: error
