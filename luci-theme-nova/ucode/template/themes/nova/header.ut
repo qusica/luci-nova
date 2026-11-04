@@ -51,8 +51,19 @@
 		<header>
 			<a class="brand" href="{{ dispatcher.build_url("admin") }}"><span class="nova-brand-mark">N</span><span class="nova-brand-name">Nova</span></a><span class="nova-hostname">{{ striptags(boardinfo.hostname ?? '?') }}</span>
 			<ul class="nav" id="topmenu" style="display:none"></ul>
-			<div id="indicators" class="pull-right"></div>
+			<div class="nova-sidebar-foot"><span class="nova-footer-dot">●</span> Nova for OpenWrt</div>
 		</header>
+
+        <div class="nova-topbar" role="banner">
+            <div class="nova-current-page">{{ striptags(_(dispatched?.title ?? 'Dashboard')) }}</div>
+            <div class="nova-top-actions">
+                <label class="nova-search-wrap"><span aria-hidden="true">⌕</span><input id="nova-search" type="search" placeholder="搜索菜单 / Search menu" aria-label="搜索菜单"></label>
+                <button class="nova-refresh" id="nova-refresh" type="button" title="刷新页面"><span aria-hidden="true">↻</span> 刷新</button>
+                <span class="nova-device"><span class="nova-live-dot">●</span>{{ striptags(boardinfo.hostname ?? '?') }} · {{ striptags(boardinfo.model ?? '') }}</span>
+                <div id="indicators" class="pull-right"></div>
+            </div>
+        </div>
+        <script src="{{ media }}/nova-shell.js"></script>
 
 		<div id="maincontent" class="container">
 			{% if (getuid() == 0 && getspnam('root')?.pwdp === ''): %}
