@@ -1,7 +1,15 @@
 {
   "luci-app-nova-dashboard": {
-    "description": "Read-only access for Nova status overview",
+    "description": "Read-only Nova dashboard device, interface, Wi-Fi and rate statistics",
     "read": {
+      "file": {
+        "/proc/stat": [
+          "read"
+        ],
+        "/sys/class/thermal/thermal_zone*/temp": [
+          "read"
+        ]
+      },
       "ubus": {
         "system": [
           "board",
@@ -9,8 +17,28 @@
         ],
         "network.interface": [
           "dump"
+        ],
+        "luci": [
+          "getRealtimeStats"
+        ],
+        "luci-rpc": [
+          "getNetworkDevices",
+          "getWirelessDevices",
+          "getHostHints",
+          "getBoardJSON"
+        ],
+        "iwinfo": [
+          "assoclist"
+        ],
+        "file": [
+          "read"
         ]
-      }
+      },
+      "uci": [
+        "network",
+        "wireless",
+        "luci"
+      ]
     }
   }
 }
