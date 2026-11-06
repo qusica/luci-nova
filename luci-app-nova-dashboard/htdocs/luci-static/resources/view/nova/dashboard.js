@@ -5,6 +5,9 @@
 'require network';
 'require fs';
 
+// Keep in sync with PKG_VERSION; tests enforce this cache key on every release.
+var dashboardAssetVersion = '0.2.1';
+
 var getBoard = rpc.declare({ object: 'system', method: 'board' });
 var getInfo = rpc.declare({ object: 'system', method: 'info' });
 var getInterfaces = rpc.declare({ object: 'network.interface', method: 'dump' });
@@ -289,8 +292,12 @@ return view.extend({
         ]);
         var bottom=el('div','nv-bottom-grid',[trend,wifiCard('2.4',groups['2.4']),wifiCard('5',groups['5'])]);
         var root=E('div',{'class':'nova-dashboard'},[header,cards,mainCard,bottom]);
-        if(!document.getElementById('nova-dashboard-style')){
-            document.head.appendChild(E('link',{'id':'nova-dashboard-style','rel':'stylesheet','href':L.resource('nova/dashboard.css')}));
+        var styleHref=L.resource('nova/dashboard.css')+'?v='+dashboardAssetVersion;
+        var style=document.getElementById('nova-dashboard-style');
+        if(!style){
+            document.head.appendChild(E('link',{'id':'nova-dashboard-style','rel':'stylesheet','href':styleHref}));
+        }else if(style.getAttribute('href')!==styleHref){
+            style.setAttribute('href',styleHref);
         }
         var self=this, prevSample=getCpuSample(cpuRaw), currentDown=null;
         var wifiDevs={

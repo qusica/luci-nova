@@ -2,7 +2,7 @@
 
 Nova is a dark LuCI theme and a companion status dashboard for OpenWrt and ImmortalWrt.
 
-> Preview 0.2.0: screenshot-inspired layout, live status metrics and dual package formats. This is still experimental and has not been tested on every router or firmware. Keep Bootstrap installed for safe rollback.
+> Preview 0.2.1: screenshot-inspired layout, live status metrics and versioned browser assets. This is still experimental and has not been tested on every router or firmware. Keep Bootstrap installed for safe rollback.
 
 ## Packages
 
@@ -83,6 +83,7 @@ Run the dependency-free dashboard rendering tests with Node.js 18 or newer:
 
 ```sh
 node --test tests/dashboard.test.js
+node --test tests/asset-version.test.js
 node --check luci-app-nova-dashboard/htdocs/luci-static/resources/view/nova/dashboard.js
 node --check luci-theme-nova/htdocs/luci-static/nova/nova-shell.js
 ```
@@ -97,8 +98,16 @@ Chrome or Chromium (the GitHub runner includes `google-chrome`):
 CHROME_BIN=google-chrome node --test tests/browser-layout.test.js
 ```
 
-The browser test uses local fixtures only. It checks the actual Nova styles but
-does not verify the router's stylesheet delivery or the full Bootstrap/LuCI stack.
+The browser test uses local fixtures only. It starts with a stale stylesheet link,
+loads the current versioned CSS, and checks the actual Nova styles. It does not
+verify the router's cache headers or the full Bootstrap/LuCI stack.
+
+When changing browser assets, bump `PKG_VERSION` in both package Makefiles and
+`dashboardAssetVersion` in dashboard.js. LuCI's template substitution uses
+`PKG_VERSION` for CSS/JS cache keys and ignores `PKG_RELEASE`; an r-only update can
+leave the old styles cached. CI compares changed assets with the PR/push base and
+rejects that mistake. To run the same comparison locally, set
+`NOVA_ASSET_BASE` to the previous commit when running `tests/asset-version.test.js`.
 
 ## Design and safety
 
@@ -110,6 +119,13 @@ does not verify the router's stylesheet delivery or the full Bootstrap/LuCI stac
 ## License
 
 Project-authored files: MIT. Templates adapted from the LuCI Bootstrap theme retain their upstream Apache-2.0 notices.
+
+## What's new in 0.2.1
+
+- Fresh theme cache keys and versioned dashboard CSS on upgrades, including replacement of an older stylesheet link left in the page.
+- Missing LAN devices are shown as unavailable instead of `undefined` or an assumed bridge name.
+- Narrow-screen navigation dropdowns no longer inherit the desktop sidebar's clipping overflow.
+- Rendering, upgrade-link, responsive layout, and asset-version regression checks run before APK builds.
 
 ## What's new in 0.2.0
 
@@ -123,7 +139,7 @@ Project-authored files: MIT. Templates adapted from the LuCI Bootstrap theme ret
 
 ### Updating an existing installation
 
-Make sure to download the fresh 0.2.0 packages from a **successful** CI run.
+Make sure to download the fresh 0.2.1 packages from a **successful** CI run.
 Install both packages again using your device's normal package-manager update/upgrade procedure,
 and reload the browser without cached assets. SSH rollback remains available above.
 

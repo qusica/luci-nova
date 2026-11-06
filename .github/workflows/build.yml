@@ -29,6 +29,10 @@ jobs:
           node --check luci-theme-nova/htdocs/luci-static/nova/nova-shell.js
       - name: Test dashboard rendering
         run: node --test tests/dashboard.test.js
+      - name: Test asset cache versions
+        env:
+          NOVA_ASSET_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: node --test tests/asset-version.test.js
       - name: Test dashboard and navigation layout in Chrome
         run: node --test tests/browser-layout.test.js
       - name: Build from matching OpenWrt SDK
