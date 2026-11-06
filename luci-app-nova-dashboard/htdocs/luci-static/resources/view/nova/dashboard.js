@@ -144,8 +144,8 @@ function node(klass,icon,name,sub,details,target) {
 }
 function bucket(net){
     var f=Number(net.getFrequency ? net.getFrequency() : 0);
-    if(f>=5.925) return '6';
-    if(f>=4.8) return '5';
+    if(f>=5.925 && f<=7.125) return '6';
+    if(f>=4.8 && f<5.925) return '5';
     if(f>2 && f<3) return '2.4';
     var band=net.getBand && net.getBand();
     return band==='2g' ? '2.4' : band==='5g' ? '5' : band==='6g' ? '6' : 'other';
@@ -166,7 +166,8 @@ function bands(networks,assocLists){
 function groupCount(g){return (g||[]).reduce(function(v,n){return v+n.assocs.length;},0);}
 function clientSummary(g) { return g.every(function(n){return n.known;}) ? groupCount(g)+' 客户端' : '客户端数不可用'; }
 function firstNet(g){
-    return (g||[]).find(function(a){return a.net.getIfname && a.net.getIfname() && (!a.net.isDisabled || !a.net.isDisabled());}) || (g||[])[0];
+    return (g||[]).find(function(a){return a.net.isUp && a.net.isUp() && (!a.net.isDisabled || !a.net.isDisabled());}) ||
+        (g||[]).find(function(a){return a.net.getIfname && a.net.getIfname() && (!a.net.isDisabled || !a.net.isDisabled());}) || (g||[])[0];
 }
 function wifiSummary(g){
     if(!g || !g.length) return '未检测到无线接口';

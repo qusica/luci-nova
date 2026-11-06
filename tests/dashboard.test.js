@@ -164,6 +164,19 @@ test('6 GHz and unknown bands are not mislabeled from low channel numbers',async
     assert.doesNotMatch(text(root),/2\.4 GHz|other GHz/);
 });
 
+test('unsupported 60 GHz radio is not manufactured into a 6 GHz card',async()=>{
+    const root=await harness().render([], {radio0:radio('',{frequency:60480,channel:2})});
+    assert.equal(count(root,'nv-wifi'),1);assert.match(text(root),/无线（频段未知）/);assert.doesNotMatch(text(root),/6 GHz/);
+});
+
+test('active network is sampled before a stale down interface in the same band',async()=>{
+    const app=harness(),down=radio('2g',{up:false});down.interfaces[0].ifname='old-ap0';
+    await app.render([], {radio0:down,radio1:radio('2g',{ifname:'phy1-ap0'})});
+    await app.poll();
+    const samples=app.calls.filter(c=>c[0]==='luci.getRealtimeStats');
+    assert.ok(samples.some(c=>c[2]==='phy1-ap0'));assert.ok(!samples.some(c=>c[2]==='old-ap0'));
+});
+
 test('multiple networks in one band make one band card, not a fake band count',async()=>{
     const app=harness();const r=radio();r.interfaces.push({...r.interfaces[0],section:'guest',ifname:'phy0-ap1'});
     const root=await app.render([], {radio0:r});

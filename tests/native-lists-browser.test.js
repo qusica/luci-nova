@@ -78,7 +78,27 @@ test('native lists preserve modules/actions, grouping, focus, polling and bounde
         }
         async function until(expression) {
             for (let i = 0; i < 100; i++) { if (await evaluate(expression)) return; await delay(25); }
-            assert.fail('Timed out: ' + expression);
+            const diagnostic = await evaluate(`(()=>{
+                const active=document.activeElement;
+                return { readyState:document.readyState, hasFocus:document.hasFocus(),
+                    active:active && {tag:active.tagName, id:active.id, key:active.getAttribute('data-nova-list-focus')},
+                    groups:Array.from(document.querySelectorAll('.nova-list-group'),details=>({
+                        open:details.open, expanded:details.querySelector('summary').getAttribute('aria-expanded'),
+                        summaryTag:details.firstElementChild.tagName,
+                        summaryDisplay:getComputedStyle(details.firstElementChild).display
+                    })), keyEvents:window.nativeKeyEvents || [] };
+            })()`);
+            assert.fail('Timed out: ' + expression + '\nNative fixture state: ' + JSON.stringify(diagnostic));
+        }
+        async function nativeKey(key, code, virtualKey, text) {
+            // Like Chromium's normal keyboard input (and Playwright), provide text
+            // for Enter/Space. A keyDown without it omits the keypress/default
+            // activation path used by native <summary>, unlike JS keydown handlers.
+            await send('Input.dispatchKeyEvent', {
+                type: 'keyDown', key, code, windowsVirtualKeyCode: virtualKey,
+                text, unmodifiedText: text
+            });
+            await send('Input.dispatchKeyEvent', { type: 'keyUp', key, code, windowsVirtualKeyCode: virtualKey });
         }
         async function input(value) {
             await evaluate(`(()=>{const q=document.getElementById('nova-search-leases');q.value=${JSON.stringify(value)};q.dispatchEvent(new Event('input',{bubbles:true}));})()`);
@@ -98,10 +118,22 @@ test('native lists preserve modules/actions, grouping, focus, polling and bounde
         assert.equal(await evaluate('document.getElementById("storage-data").textContent.includes("/mnt/data")'), true);
         assert.equal(await evaluate('!!document.querySelector("#radio-summary") && !!document.querySelector("#plugin-action")'), true);
         // Native keyboard interaction, not programmatic details.open.
-        await evaluate('document.querySelector("[data-nova-list-focus=status_leases-summary]").focus()');
-        await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
-        await send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
+        await evaluate(`(()=>{
+            window.nativeKeyEvents=[];
+            const summary=document.querySelector('[data-nova-list-focus=status_leases-summary]');
+            for(const type of ['keydown','keypress','keyup','click']) summary.addEventListener(type,event=>{
+                window.nativeKeyEvents.push({type:event.type,key:event.key, trusted:event.isTrusted, defaultPrevented:event.defaultPrevented});
+            });
+            summary.focus();
+        })()`);
+        assert.equal(await evaluate('document.activeElement.getAttribute("data-nova-list-focus")'), 'status_leases-summary');
+        await nativeKey('Enter', 'Enter', 13, '\r');
         await until('document.getElementById("status_leases").closest("details").open && document.querySelector("[data-nova-list-focus=status_leases-summary]").getAttribute("aria-expanded") === "true"');
+        await nativeKey(' ', 'Space', 32, ' ');
+        await until('!document.getElementById("status_leases").closest("details").open && document.querySelector("[data-nova-list-focus=status_leases-summary]").getAttribute("aria-expanded") === "false"');
+        await nativeKey('Enter', 'Enter', 13, '\r');
+        await until('document.getElementById("status_leases").closest("details").open && document.querySelector("[data-nova-list-focus=status_leases-summary]").getAttribute("aria-expanded") === "true"');
+        assert.equal(await evaluate('window.nativeKeyEvents.some(event=>event.type==="keypress" && event.key==="Enter" && event.trusted)'), true);
         assert.equal(await evaluate('document.querySelector("[data-nova-list-focus=status_leases-summary]").getAttribute("aria-expanded")'), 'true');
         await evaluate('document.querySelector("#status_leases tr[data-index=0] button").click()');
         assert.equal(await evaluate('window.actionCount'), 1);
