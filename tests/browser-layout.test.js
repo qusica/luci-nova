@@ -63,12 +63,19 @@ try {
                 key==='iwinfo.assoclist'?{results:[]}:key==='luci.getRealtimeStats'?[[1,100,0,50],[4,400,0,200]]:{});
         }},{add:fn=>polls.add(fn),remove:fn=>polls.delete(fn)},{read:()=>Promise.resolve(null)},E,
         {url:x=>'/cgi-bin/luci/'+x,resource:x=>${JSON.stringify(dashboardUrl)}},document);
+    const data=await app.load();
     const stylesheet=document.getElementById('nova-dashboard-style');
+    const expectedHref=${JSON.stringify(dashboardUrl)}+'?v=0.2.3';
     const styleLoaded=new Promise((resolve,reject)=>{
-        stylesheet.addEventListener('load',resolve,{once:true});
+        function loaded(){
+            if(stylesheet.getAttribute('href')===expectedHref && stylesheet.sheet && stylesheet.sheet.href===expectedHref){
+                stylesheet.removeEventListener('load',loaded);resolve();
+            }
+        }
+        stylesheet.addEventListener('load',loaded);
         stylesheet.addEventListener('error',()=>reject(new Error('versioned dashboard CSS failed to load')),{once:true});
     });
-    document.getElementById('maincontent').append(app.render(await app.load()));
+    document.getElementById('maincontent').append(app.render(data));
     await styleLoaded;
     function check(condition,message){if(!condition)throw new Error(message);}
     check(stylesheet.getAttribute('href')===${JSON.stringify(dashboardUrl)}+'?v=0.2.3','stale CSS link was not upgraded');
@@ -153,8 +160,8 @@ for(const width of ${JSON.stringify(widths)})for(const scenario of ${JSON.string
         assert.notEqual(match[1], 'pending', 'browser did not finish all viewport fixtures');
         const results = JSON.parse(match[1]);
         assert.deepEqual(results.map(result => result.width+'|'+result.scenario).sort(),widths.flatMap(width=>scenarios.map(scenario=>width+'|'+scenario)).sort());
-        for (const result of results) assert.equal(result.passed, true, JSON.stringify(result));
         console.log(JSON.stringify(results));
+        for (const result of results) assert.equal(result.passed, true, JSON.stringify(result));
     } finally {
         fs.rmSync(temporary, { recursive: true, force: true });
     }
