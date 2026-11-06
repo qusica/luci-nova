@@ -1,0 +1,104 @@
+name: Build signed APK packages
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: signed-apk-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    # No signing on pull requests, forks, or manually selected feature branches.
+    if: github.repository == 'qusica/luci-nova' && (github.ref == 'refs/heads/main' || (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')))
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Require release commit to belong to main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git merge-base --is-ancestor HEAD refs/remotes/origin/main
+      - name: Check JavaScript syntax
+        run: |
+          node --check luci-app-nova-dashboard/htdocs/luci-static/resources/view/nova/dashboard.js
+          node --check luci-theme-nova/htdocs/luci-static/nova/nova-shell.js
+      - name: Build unsigned APKs without access to signing credentials
+        uses: openwrt/gh-action-sdk@f5813d30eeef3534b58ac7e79c5d8842b6035434
+        env:
+          ARCH: x86_64-25.12.6
+          FEEDNAME: nova
+          PACKAGES: luci-theme-nova luci-app-nova-dashboard
+          BUILD_LOG: 1
+      - name: Upload intermediate packages for this run
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: intermediate-unsigned-apk-${{ github.run_id }}
+          path: |
+            bin/packages/**/luci-theme-nova-*.apk
+            bin/packages/**/luci-app-nova-dashboard-*.apk
+          if-no-files-found: error
+          retention-days: 1
+
+  sign:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Download only this run's unsigned packages
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: intermediate-unsigned-apk-${{ github.run_id }}
+          path: unsigned
+      - name: Install signing tool build dependencies before loading secrets
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends build-essential meson ninja-build pkg-config libssl-dev zlib1g-dev libzstd-dev
+      - name: Build pinned and checksummed APK tool
+        run: bash scripts/build-host-apk.sh "$RUNNER_TEMP/nova-host-apk"
+      - name: Sign each package and verify against reviewed key fingerprint
+        shell: bash
+        env:
+          NOVA_APK_SIGNING_KEY: ${{ secrets.NOVA_APK_SIGNING_KEY }}
+          NOVA_APK_SIGNING_PUBLIC_KEY_SHA256: ${{ vars.NOVA_APK_SIGNING_PUBLIC_KEY_SHA256 }}
+        run: |
+          set +x
+          set -euo pipefail
+          mapfile -d '' themes < <(find unsigned -type f -name 'luci-theme-nova-*.apk' -print0)
+          mapfile -d '' dashboards < <(find unsigned -type f -name 'luci-app-nova-dashboard-*.apk' -print0)
+          test "${#themes[@]}" -eq 1
+          test "${#dashboards[@]}" -eq 1
+          bash scripts/sign-release-apks.sh "$RUNNER_TEMP/nova-host-apk/build/src/apk" \
+            "${themes[0]}" "${dashboards[0]}" "$RUNNER_TEMP/nova-release-signed"
+      - name: Record source provenance
+        shell: bash
+        run: |
+          printf 'repository=%s\ncommit=%s\nref=%s\nrun=%s/%s/actions/runs/%s\n' \
+            "$GITHUB_REPOSITORY" "$GITHUB_SHA" "$GITHUB_REF" \
+            "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" \
+            > "$RUNNER_TEMP/nova-release-signed/BUILD-SOURCE.txt"
+      - name: Upload verified signed packages and public key only
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: luci-nova-25.12-signed-apk-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/nova-release-signed/*.apk
+            ${{ runner.temp }}/nova-release-signed/nova-signing-public.pem
+            ${{ runner.temp }}/nova-release-signed/PUBLIC-KEY-SHA256.txt
+            ${{ runner.temp }}/nova-release-signed/SHA256SUMS
+            ${{ runner.temp }}/nova-release-signed/BUILD-SOURCE.txt
+          if-no-files-found: error
+          retention-days: 30
