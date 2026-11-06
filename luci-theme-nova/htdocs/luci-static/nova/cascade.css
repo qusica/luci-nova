@@ -69,9 +69,8 @@ header .brand:hover{color:#fff;text-decoration:none}
  width:100%;min-width:0;margin:2px 0 5px;padding:2px 0 2px 12px;
  background:none;border:0;box-shadow:none;transform:none;
 }
-#topmenu>li.open>.dropdown-menu,
-#topmenu>li.active>.dropdown-menu,
-#topmenu>li:hover>.dropdown-menu{display:block}
+#topmenu>li.open>.dropdown-menu{display:block}
+#topmenu a:focus-visible{outline:2px solid #c5ef4d;outline-offset:-2px}
 #topmenu .dropdown-menu a{
  display:block;border-radius:6px;padding:7px 10px;
  color:#a7adb9;background:transparent;font-size:12px;
