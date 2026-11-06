@@ -1,8 +1,5 @@
-name: Build IPK and APK
+name: Build APK
 on:
-  push:
-    branches: [main]
-    tags: ['v*']
   pull_request:
   workflow_dispatch:
 
@@ -16,11 +13,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - series: '24.10'
-            sdk: '24.10.8'
-            arch: 'x86_64'
-            ext: ipk
-            package_separator: '_'
+          # IPK builds are paused until feature development is complete.
           - series: '25.12'
             sdk: '25.12.6'
             arch: 'x86_64'

@@ -20,7 +20,11 @@ One source tree supports both package managers via the matching OpenWrt SDK:
 
 ImmortalWrt support depends on its actual LuCI/API and package-manager version; the target should be built against a compatible SDK. File extensions are *not* interchangeable.
 
-The GitHub Actions workflow builds both `24.10` IPK and `25.12` APK artifacts. Both Lua/ucode templates and static browser resources are platform-independent; the packages are intended for the `all` architecture.
+GitHub Actions currently builds `25.12` APK artifacts only. Automatic IPK builds
+are paused until feature development is complete; the source still supports
+building IPK manually with a matching SDK. Both Lua/ucode templates and static
+browser resources are platform-independent; the packages are intended for the
+`all` architecture.
 
 ## Install
 
