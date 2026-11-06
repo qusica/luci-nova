@@ -77,6 +77,29 @@ make package/feeds/nova/luci-app-nova-dashboard/compile V=s
 
 The output suffix (`.ipk` or `.apk`) is decided by the SDK. Prefer official versions matching the running firmware.
 
+## Development checks
+
+Run the dependency-free dashboard rendering tests with Node.js 18 or newer:
+
+```sh
+node --test tests/dashboard.test.js
+node --check luci-app-nova-dashboard/htdocs/luci-static/resources/view/nova/dashboard.js
+node --check luci-theme-nova/htdocs/luci-static/nova/nova-shell.js
+```
+
+These tests exercise LuCI rendering with DOM/RPC doubles. They do not replace
+browser layout checks or testing on an actual OpenWrt installation.
+
+For isolated layout checks at desktop, tablet, and phone widths, use an installed
+Chrome or Chromium (the GitHub runner includes `google-chrome`):
+
+```sh
+CHROME_BIN=google-chrome node --test tests/browser-layout.test.js
+```
+
+The browser test uses local fixtures only. It checks the actual Nova styles but
+does not verify the router's stylesheet delivery or the full Bootstrap/LuCI stack.
+
 ## Design and safety
 
 - No hard-coded WAN interface names or credentials.

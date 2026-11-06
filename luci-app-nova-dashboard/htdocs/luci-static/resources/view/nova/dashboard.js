@@ -199,6 +199,9 @@ return view.extend({
         var worst=clientSignals.length?Math.min.apply(Math,clientSignals):null;
         var wan=getWan(entries);
         var wanDev=wan&&(wan.l3_device || wan.device);
+        var lan=entries.find(function(n){return n.interface==='lan';}) || {};
+        var lanDev=lan.l3_device || lan.device;
+        var lanSummary=lanDev ? 'LAN '+lanDev : '未检测到 LAN 接口';
         var mem=sys.memory||{},root=sys.root||{};
         var memUsed=number(mem.total)-number(mem.available!=null?mem.available:mem.free);
         var memPct=percent(memUsed,mem.total);
@@ -223,18 +226,18 @@ return view.extend({
                         E('small',{},wanDev||'WAN')
                     ]),
                     node('nv-router','▣',board.hostname||'本地主路由',model,
-                        firmware+' · LAN '+(entries.find(function(x){return x.interface==='lan';})||{}).l3_device,L.url('admin/status/overview')),
+                        firmware+' · '+lanSummary,L.url('admin/status/overview')),
                     el('div','nv-fork', [el('span','', '')]),
                     el('div','nv-path-channels',[
                         node('nv-radio','◈','2.4 GHz',groups['2.4'].length?wifiSummary(groups['2.4']):'未检测到', 'Wi-Fi 2.4 GHz · '+wifiSummary(groups['2.4']),L.url('admin/network/wireless')),
                         node('nv-radio nv-five','◈','5 GHz',groups['5'].length?wifiSummary(groups['5']):'未检测到','Wi-Fi 5 GHz · '+wifiSummary(groups['5']),L.url('admin/network/wireless')),
-                        node('nv-radio','▤','有线 LAN',(entries.find(function(x){return x.interface==='lan';})||{}).l3_device||'br-lan','有线设备数暂不可判定 · 仅显示 LAN 接口',L.url('admin/network/network'))
+                        node('nv-radio','▤','有线 LAN',lanDev||'未检测到 LAN 接口','有线设备数暂不可判定 · '+lanSummary,L.url('admin/network/network'))
                     ]),
                     el('div','nv-branch-lines',[el('span','', ''),el('span','', ''),el('span','', '')]),
                     el('div','nv-path-clients',[
                         node('nv-client','♧',groups['2.4'].length?groups['2.4'][0].net.getActiveSSID()||'2.4 GHz SSID':'2.4 GHz 无线',groupCount(groups['2.4'])+' 客户端','该频段关联客户端：'+groupCount(groups['2.4']),L.url('admin/status/overview')),
                         node('nv-client','♧',groups['5'].length?groups['5'][0].net.getActiveSSID()||'5 GHz SSID':'5 GHz 无线',groupCount(groups['5'])+' 客户端','该频段关联客户端：'+groupCount(groups['5']),L.url('admin/status/overview')),
-                        node('nv-client','▤','LAN', (entries.find(function(x){return x.interface==='lan';})||{}).device||'有线接口', '有线端口和设备详情请查看接口设置',L.url('admin/network/network'))
+                        node('nv-client','▤','LAN',lan.device||lanDev||'未检测到 LAN 接口','有线端口和设备详情请查看接口设置',L.url('admin/network/network'))
                     ])
                 ])
             ]),

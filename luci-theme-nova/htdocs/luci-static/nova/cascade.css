@@ -130,7 +130,9 @@ footer{margin-left:232px;padding:14px 25px;border-top:1px solid #24272d;
 footer a{color:#a5c45f}
 @media(max-width:1180px){.nova-search-wrap{width:180px}.nova-device{max-width:200px}}
 @media(max-width:900px){
- header{position:relative;width:100%;height:auto;min-height:0;padding:0 10px 10px;border-right:0;border-bottom:1px solid #292c34}
+ /* Horizontal navigation uses pop-out menus, not the desktop scroll container. */
+ header{position:relative;width:100%;height:auto;min-height:0;padding:0 10px 10px;border-right:0;border-bottom:1px solid #292c34;
+  box-sizing:border-box;overflow:visible}
  header .brand{width:calc(100% + 20px);margin:0 0 8px -10px}
  #topmenu{flex-direction:row;flex-wrap:wrap;gap:3px}
  #topmenu>li{width:auto}
