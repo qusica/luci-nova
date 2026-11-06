@@ -105,7 +105,7 @@ test('render links the packaged stylesheet once and removes its poll on teardown
     const style = app.document.head.children[0];
     assert.equal(style.tag, 'link');
     assert.equal(style.attrs.rel, 'stylesheet');
-    assert.equal(style.attrs.href, '/luci-static/resources/nova/dashboard.css?v=0.2.1');
+    assert.equal(style.attrs.href, '/luci-static/resources/nova/dashboard.css?v=0.2.2');
     assert.ok(fs.statSync(path.join(resources, 'nova/dashboard.css')).size > 0);
     app.view.remove();
     assert.equal(app.polls.size, 0);
@@ -123,7 +123,7 @@ test('render upgrades an existing unversioned or old stylesheet without duplicat
     for (const oldHref of ['/luci-static/resources/nova/dashboard.css', '/luci-static/resources/nova/dashboard.css?v=0.2.0']) {
         style.attrs.href = oldHref;
         app.render();
-        assert.equal(style.attrs.href, '/luci-static/resources/nova/dashboard.css?v=0.2.1');
+        assert.equal(style.attrs.href, '/luci-static/resources/nova/dashboard.css?v=0.2.2');
         assert.equal(app.document.head.children.length, 1);
         app.view.remove();
     }

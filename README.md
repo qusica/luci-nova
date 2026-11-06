@@ -2,7 +2,7 @@
 
 Nova is a dark LuCI theme and a companion status dashboard for OpenWrt and ImmortalWrt.
 
-> Preview 0.2.1: screenshot-inspired layout, live status metrics and versioned browser assets. This is still experimental and has not been tested on every router or firmware. Keep Bootstrap installed for safe rollback.
+> Preview 0.2.2: click-controlled navigation, live status metrics and versioned browser assets. This is still experimental and has not been tested on every router or firmware. Keep Bootstrap installed for safe rollback.
 
 ## Packages
 
@@ -96,11 +96,14 @@ Chrome or Chromium (the GitHub runner includes `google-chrome`):
 
 ```sh
 CHROME_BIN=google-chrome node --test tests/browser-layout.test.js
+CHROME_BIN=google-chrome node --test tests/navigation-browser.test.js
 ```
 
 The browser test uses local fixtures only. It starts with a stale stylesheet link,
 loads the current versioned CSS, and checks the actual Nova styles. It does not
 verify the router's cache headers or the full Bootstrap/LuCI stack.
+The navigation test sends real Chrome mouse, keyboard, and touch input to check
+that hovering cannot expand menus or move the next click target.
 
 When changing browser assets, bump `PKG_VERSION` in both package Makefiles and
 `dashboardAssetVersion` in dashboard.js. LuCI's template substitution uses
@@ -119,6 +122,13 @@ rejects that mistake. To run the same comparison locally, set
 ## License
 
 Project-authored files: MIT. Templates adapted from the LuCI Bootstrap theme retain their upstream Apache-2.0 notices.
+
+## What's new in 0.2.2
+
+- Sidebar groups open and close on click or tap. Moving the pointer over a menu only highlights it, so links stay still while choosing a destination.
+- Enter/Space toggle a focused group, Arrow Down opens it and focuses its first link, and Escape closes it and returns focus to the group button. Tab remains normal navigation; moving focus or clicking outside closes open groups.
+- Disclosure state is exposed through `aria-expanded` and `aria-controls`; actual page links keep their normal navigation.
+- Real mouse, keyboard, and touch regression tests run before APK builds.
 
 ## What's new in 0.2.1
 
@@ -139,7 +149,7 @@ Project-authored files: MIT. Templates adapted from the LuCI Bootstrap theme ret
 
 ### Updating an existing installation
 
-Make sure to download the fresh 0.2.1 packages from a **successful** CI run.
+Make sure to download the fresh 0.2.2 packages from a **successful** CI run.
 Install both packages again using your device's normal package-manager update/upgrade procedure,
 and reload the browser without cached assets. SSH rollback remains available above.
 
