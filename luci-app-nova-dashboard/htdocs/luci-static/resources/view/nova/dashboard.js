@@ -2,20 +2,95 @@
 'require view';
 'require rpc';
 'require poll';
-'require network';
 'require fs';
 
 // Keep in sync with PKG_VERSION; tests enforce this cache key on every release.
-var dashboardAssetVersion = '0.2.2';
+var dashboardAssetVersion = '0.2.3';
 
 var getBoard = rpc.declare({ object: 'system', method: 'board' });
 var getInfo = rpc.declare({ object: 'system', method: 'info' });
-var getInterfaces = rpc.declare({ object: 'network.interface', method: 'dump' });
+// Do not default failed detection to an empty inventory. LuCI RPC otherwise
+// resolves ubus error codes (and expect:{} can silently mask them).
+var getInterfaces = rpc.declare({ object: 'network.interface', method: 'dump', reject: true });
+var getWirelessStatus = rpc.declare({ object: 'network.wireless', method: 'status', reject: true });
+var getWireless = rpc.declare({ object: 'luci-rpc', method: 'getWirelessDevices', reject: true });
+var getAssocs = rpc.declare({ object: 'iwinfo', method: 'assoclist', params: [ 'device' ], reject: true });
 var getRealtime = rpc.declare({
     object: 'luci', method: 'getRealtimeStats',
     params: [ 'mode', 'device' ], expect: { result: [] }
 });
-var getNetworkDevices = rpc.declare({ object: 'luci-rpc', method: 'getNetworkDevices', expect: { '': {} } });
+function object(value) { return value != null && typeof value === 'object' && !Array.isArray(value); }
+function interfaceDump(value) {
+    if (!object(value) || !Array.isArray(value.interface) || value.interface.some(function(n) {
+        return !object(n) || typeof n.interface !== 'string' ||
+            ['route','ipv4-address','ipv6-address','dns-server'].some(function(key){return n[key]!=null && !Array.isArray(n[key]);}) ||
+            (n.inactive!=null && (!object(n.inactive) || (n.inactive.route!=null && !Array.isArray(n.inactive.route))));
+    })) throw new Error('Invalid interface inventory');
+    return value;
+}
+function wirelessDump(value) {
+    if (!object(value) || Object.keys(value).some(function(name) {
+        var radio = value[name];
+        return !object(radio) || !object(radio.config) || !Array.isArray(radio.interfaces) || radio.interfaces.some(function(vif){return !object(vif);});
+    })) throw new Error('Invalid wireless inventory');
+    return value;
+}
+// luci-rpc returns netifd's configured radios, including disabled/down radios.
+// A radio with no VIF still exists. Do not invent wlan names or default bands.
+function wifiNetworks(radios) {
+    var nets = [];
+    Object.keys(radios || {}).forEach(function(name) {
+        var radio = radios[name];
+        (radio.interfaces.length ? radio.interfaces : [{}]).forEach(function(vif) {
+            var config = vif.config || {}, iw = vif.iwinfo || radio.iwinfo || {}, rc = radio.config;
+            nets.push({
+                getName: function() { return vif.section || name; },
+                getIfname: function() { return vif.ifname || ''; },
+                getAssocDevices: function() { return [vif.ifname].concat((vif.vlans || []).map(function(v){return v.ifname;})).filter(function(n,i,a){return n && a.indexOf(n)===i;}); },
+                getActiveSSID: function() { return iw.ssid || config.ssid || name; },
+                getFrequency: function() { return iw.frequency ? iw.frequency / 1000 : null; },
+                getChannel: function() { return iw.channel || null; },
+                getTXPower: function() { return iw.txpower != null ? iw.txpower : null; },
+                getNoise: function() { return iw.noise != null ? iw.noise : null; },
+                getBand: function() { return rc.band || (rc.hwmode === '11a' ? '5g' : rc.hwmode === '11g' ? '2g' : ''); },
+                isDisabled: function() { return radio.disabled === true || rc.disabled === true || rc.disabled === '1' || config.disabled === true || config.disabled === '1'; },
+                isUp: function() { return radio.up === true && !!vif.ifname; }
+            });
+        });
+    });
+    return nets;
+}
+function readDetection() {
+    return Promise.all([
+        safe(getInterfaces().then(interfaceDump), null),
+        safe(Promise.all([getWirelessStatus().then(wirelessDump),safe(getWireless(),null)]).then(function(results){
+            var status=results[0], enriched=results[1];
+            // luci-rpc masks an underlying netifd timeout as {}, so only the
+            // direct network.wireless status may establish presence/absence.
+            Object.keys(status).forEach(function(name){
+                var extra=object(enriched) && enriched[name];
+                if(!object(extra))return;
+                status[name].iwinfo=extra.iwinfo;
+                status[name].interfaces.forEach(function(vif){
+                    var match=(Array.isArray(extra.interfaces)?extra.interfaces:[]).find(function(n){return object(n) && n.section===vif.section && n.ifname===vif.ifname;});
+                    if(match)vif.iwinfo=match.iwinfo;
+                });
+            });
+            return status;
+        }), null)
+    ]);
+}
+function readStations(nets) {
+    return Promise.all(nets.map(function(n) {
+        if (!n.isUp() || n.isDisabled() || !n.getIfname()) return [];
+        return safe(Promise.all(n.getAssocDevices().map(function(device){
+            return getAssocs(device).then(function(value) {
+                if (!object(value) || !Array.isArray(value.results)) throw new Error('Invalid station list');
+                return value.results;
+            });
+        })).then(function(lists){return [].concat.apply([],lists);}), null);
+    }));
+}
 
 function safe(task, fallback) {
     return Promise.resolve(task).catch(function() { return fallback; });
@@ -48,12 +123,13 @@ function metric(name,value,detail,key){
 function detailLine(a,b){return el('span','nv-detail-line',[label(a),el('strong','',b)]);}
 function node(klass,icon,name,sub,details,target) {
     return E('button',{
-        'class':'nv-node '+klass,'type':'button',
+        'class':'nv-node '+klass,'type':'button','data-nova-node':klass.split(' ')[0]+'|'+name,
         'title':details,
         'click':function(){
             var field=document.getElementById('nv-selected');
             if(field) {
                 field.hidden=false;
+                field.setAttribute('data-nova-node',klass.split(' ')[0]+'|'+name);
                 field.replaceChildren(
                     el('strong','',name+' · '),
                     document.createTextNode(details),
@@ -66,33 +142,36 @@ function node(klass,icon,name,sub,details,target) {
         el('span','nv-node-text',[el('strong','nv-truncate',name),el('small','nv-truncate',sub)])
     ]);
 }
-function assocCount(list) { return Array.isArray(list) ? list.length : 0; }
 function bucket(net){
     var f=Number(net.getFrequency ? net.getFrequency() : 0);
-    var ch=Number(net.getChannel ? net.getChannel() : 0);
-    if(f>=5.9) return '6';
+    if(f>=5.925) return '6';
     if(f>=4.8) return '5';
     if(f>2 && f<3) return '2.4';
-    if(ch>=1 && ch<=14) return '2.4';
-    if(ch>=30 && ch<=196) return '5';
-    return 'other';
+    var band=net.getBand && net.getBand();
+    return band==='2g' ? '2.4' : band==='5g' ? '5' : band==='6g' ? '6' : 'other';
+}
+function bandName(band) { return band === 'other' ? '无线（频段未知）' : band+' GHz'; }
+function wifiState(g) {
+    if(g.every(function(n){return n.net.isDisabled && n.net.isDisabled();})) return '已禁用';
+    return g.some(function(n){return n.net.isUp && n.net.isUp();}) ? '已启用' : '未连接';
 }
 function bands(networks,assocLists){
     var map={'2.4':[], '5':[], '6':[], 'other':[]};
     (networks||[]).forEach(function(n,i){
-        var info={net:n,assocs:assocLists[i]||[], band:bucket(n)};
+        var info={net:n,assocs:assocLists[i]||[], known:Array.isArray(assocLists[i]), band:bucket(n)};
         map[info.band].push(info);
     });
     return map;
 }
 function groupCount(g){return (g||[]).reduce(function(v,n){return v+n.assocs.length;},0);}
+function clientSummary(g) { return g.every(function(n){return n.known;}) ? groupCount(g)+' 客户端' : '客户端数不可用'; }
 function firstNet(g){
     return (g||[]).find(function(a){return a.net.getIfname && a.net.getIfname() && (!a.net.isDisabled || !a.net.isDisabled());}) || (g||[])[0];
 }
 function wifiSummary(g){
     if(!g || !g.length) return '未检测到无线接口';
     var n=firstNet(g);
-    return (n.net.getActiveSSID && n.net.getActiveSSID() || n.net.getIfname() || 'Wi-Fi')+' · '+groupCount(g)+' 客户端';
+    return (n.net.getActiveSSID && n.net.getActiveSSID() || n.net.getIfname() || 'Wi-Fi')+' · '+wifiState(g)+' · '+clientSummary(g);
 }
 function wifiCard(band,g){
     var info=firstNet(g), net=info&&info.net;
@@ -105,33 +184,41 @@ function wifiCard(band,g){
     var colour=band==='2.4'?'blue':band==='5'?'orange':'purple';
     return E('section',{'class':'nv-panel nv-wifi nv-'+colour},[
         el('div','nv-panel-head',[
-            el('div','nv-panel-title',[tag(band+' GHz',colour),el('strong','', 'Wi-Fi')]),
-            el('div','nv-online', [dot(),g&&g.length ? '已检测' : '未检测'])
+            el('div','nv-panel-title',[tag(bandName(band),colour),el('strong','', 'Wi-Fi')]),
+            el('div','nv-online'+(wifiState(g)==='已启用'?'':' nv-inactive'), [dot(),wifiState(g)])
         ]),
         el('div','nv-wifi-main',[el('strong','', ch ? '信道 '+ch : '—'), E('span',{},f?f+' GHz':'无线信息不可用')]),
         el('div','nv-band-meter',[E('span',{'style':'width:'+Math.max(0,Math.min(100,number(ch)*1.25))+'%'})]),
         el('div','nv-band-caption',[el('span','',wifiSummary(g))]),
         el('div','nv-wifi-stats',[
-            detailLine('客户端',String(count)),
+            detailLine('客户端',g.every(function(n){return n.known;}) ? String(count) : '不可用'),
             detailLine('发射功率', tx != null ? tx+' dBm' : '—'),
             detailLine('噪声', noise != null ? noise+' dBm' : '—'),
             detailLine('接口', net&&net.getIfname&&net.getIfname() || '—')
         ]),
         el('div','nv-mini-chart',[
-            E('svg',{'viewBox':'0 0 360 76','preserveAspectRatio':'none','aria-label':band+' GHz 实时吞吐量'},[
+            E('svg',{'viewBox':'0 0 360 76','preserveAspectRatio':'none','aria-label':bandName(band)+' 实时吞吐量'},[
                 E('line',{'x1':'0','y1':'65','x2':'360','y2':'65','class':'nv-axis'}),
                 E('polyline',{'data-nova':'wifi-'+id,'class':'nv-spark','points':'0,65 360,65'})
             ]),
-            E('span',{'data-nova':'wifi-rate-'+id,'class':'nv-mini-rate'},'等待采样')
+            E('span',{'data-nova':'wifi-rate-'+id,'class':'nv-mini-rate'},net && net.isUp && net.isUp() ? '等待采样' : '接口未连接')
         ])
     ]);
 }
-function getWan(interfaces){
-    return interfaces.find(function(n){return n.interface==='wan'&&n.up;}) ||
-           interfaces.find(function(n){return n.interface==='wan6'&&n.up;}) ||
-           interfaces.find(function(n){return n.up && n.route && n.route.some(function(r){return r.target==='0.0.0.0' && r.mask===0;});}) ||
-           interfaces.find(function(n){return n.interface==='wan' || n.interface==='wan6';}) || null;
+function defaultRoute(n) {
+    return (n.route || []).concat(n.inactive && n.inactive.route || []).some(function(r) {
+        return (r.target === '0.0.0.0' || r.target === '::') && Number(r.mask) === 0;
+    });
 }
+function getWan(interfaces){
+    var candidates=interfaces.filter(function(n) {
+        return defaultRoute(n) || n.proto === 'pppoe' || n.interface === 'wan' || n.interface === 'wan6';
+    });
+    return candidates.find(function(n){return n.up && defaultRoute(n);}) ||
+        candidates.find(function(n){return n.up;}) || candidates[0] || null;
+}
+function wanState(wan) { return wan.up ? '已连接' : wan.pending ? '连接中' : '未连接'; }
+function wanLabel(wan) { return (wan.proto === 'pppoe' ? 'PPPoE' : (wan.proto || 'WAN').toUpperCase())+' · '+wan.interface; }
 function getAddress(wan, ipv6){
     if(!wan) return '—';
     var arr=wan[ipv6?'ipv6-address':'ipv4-address'];
@@ -177,23 +264,20 @@ function fillChart(raw,downPath,upPath,downRate,upRate,peakLabel){
 return view.extend({
     load:function(){
         return Promise.all([
-            safe(getBoard(),{}),
-            safe(getInfo(),{}),
-            safe(getInterfaces(),{interface:[]}),
-            safe(network.getWifiNetworks(),[]),
-            safe(getNetworkDevices(),{}),
-            safe(fs.read('/proc/stat'),null),
-            safe(fs.read('/sys/class/thermal/thermal_zone0/temp'),null)
+            safe(getBoard(),{}), safe(getInfo(),{}), readDetection(),
+            safe(fs.read('/proc/stat'),null), safe(fs.read('/sys/class/thermal/thermal_zone0/temp'),null)
         ]).then(function(d){
-            var nets=d[3]||[];
-            return Promise.all(nets.map(function(n){
-                return safe(n.getAssocList?n.getAssocList():[],[]);
-            })).then(function(stations){d.push(stations);return d;});
+            var nets=wifiNetworks(d[2][1]);
+            return readStations(nets).then(function(stations){
+                return [d[0],d[1],d[2][0],nets,{},d[3],d[4],stations,
+                    {interfaces:d[2][0]!==null,wireless:d[2][1]!==null},d[2][1]];
+            });
         });
     },
     render:function(data){
         var board=data[0]||{}, sys=data[1]||{}, entries=(data[2]||{}).interface||[];
-        var nets=data[3]||[], devices=data[4]||{}, cpuRaw=data[5],tempRaw=data[6],assocs=data[7]||[];
+        var nets=data[3]||[], cpuRaw=data[5],tempRaw=data[6],assocs=data[7]||[];
+        var detected=data[8] || {interfaces:!!data[2],wireless:Array.isArray(data[3])};
         var groups=bands(nets,assocs), wifiAll=groups['2.4'].concat(groups['5'],groups['6'],groups.other);
         var totalClients=wifiAll.reduce(function(v,n){return v+n.assocs.length;},0);
         var clientSignals=wifiAll.reduce(function(v,n){
@@ -203,69 +287,82 @@ return view.extend({
         var wan=getWan(entries);
         var wanDev=wan&&(wan.l3_device || wan.device);
         var lan=entries.find(function(n){return n.interface==='lan';}) || {};
+        var hasLan=!!lan.interface;
         var lanDev=lan.l3_device || lan.device;
-        var lanSummary=lanDev ? 'LAN '+lanDev : '未检测到 LAN 接口';
+        var lanSummary=lanDev ? 'LAN '+lanDev : hasLan ? 'LAN '+lan.interface+' · 未连接' : detected.interfaces ? '未检测到 LAN 接口' : '接口检测失败';
         var mem=sys.memory||{},root=sys.root||{};
         var memUsed=number(mem.total)-number(mem.available!=null?mem.available:mem.free);
         var memPct=percent(memUsed,mem.total);
         var diskPct=percent(root.used,root.total);
         var cpuTemp=Number(String(tempRaw||'').trim())/1000;
         var tempText=isFinite(cpuTemp)&&cpuTemp>0&&cpuTemp<130 ? cpuTemp.toFixed(0)+'°C' : '';
-        var conn=!!(wan&&wan.up), model=board.model||board.system||'OpenWrt Router';
+        var conn=!!(wan&&wan.up), status=detected.interfaces&&wan?wanState(wan):'状态未知', model=board.model||board.system||'OpenWrt Router';
         var firmware=board.release&&board.release.description||'OpenWrt';
         var ip=getAddress(wan,false);
-        var visibleBands=groups['2.4'].length + groups['5'].length + groups['6'].length;
+        var shownBands=['2.4','5','6','other'].filter(function(band){return groups[band].length;});
+        var visibleBands=shownBands.filter(function(band){return band!=='other';}).length;
+        var clientsKnown=detected.wireless && wifiAll.every(function(n){return n.known;});
+        var warnings=[];
+        if(!detected.interfaces) warnings.push('接口检测失败，无法确认 WAN/LAN 是否存在');
+        if(!detected.wireless) warnings.push('无线检测失败，无法确认无线接口是否存在');
+        if(warnings.length && (wan || nets.length || hasLan)) warnings.push('已保留上次检测结果，状态可能已过期');
+        var channels=[], clients=[];
+        shownBands.forEach(function(band){
+            var group=groups[band], title=bandName(band);
+            channels.push(node('nv-radio'+(band==='5'?' nv-five':''),'◈',title,wifiState(group),
+                title+' · '+wifiSummary(group),L.url('admin/network/wireless')));
+            clients.push(node('nv-client','♧',firstNet(group).net.getActiveSSID() || title,
+                clientSummary(group),'该频段关联'+clientSummary(group),L.url('admin/status/overview')));
+        });
+        if(hasLan){
+            channels.push(node('nv-radio','▤','有线 LAN',lanDev || '未连接','有线设备数暂不可判定 · '+lanSummary,L.url('admin/network/network')));
+            clients.push(node('nv-client','▤','LAN',lan.device||lanDev||'未连接','有线端口和设备详情请查看接口设置',L.url('admin/network/network')));
+        }
+        var path=[];
+        if(wan){
+            path.push(node('nv-internet'+(conn?'':' nv-inactive'),'◎',wanLabel(wan),status+(conn?' · '+(ip==='—'?getAddress(wan,true):ip):''),
+                wanLabel(wan)+' · '+status+' · 设备 '+(wanDev||'尚未建立')+' · IPv4 '+ip+' · IPv6 '+getAddress(wan,true)+' · DNS '+((wan['dns-server']||[]).join(', ')||'—'),L.url('admin/network/network')));
+            path.push(el('div','nv-wireline'+(conn?'':' nv-inactive'),[E('strong',{'data-nova':'path-download'},!detected.interfaces?'状态未知':conn?'↓ 等待采样':'未连接'),E('small',{},wanDev||wan.interface)]));
+        }
+        path.push(node('nv-router','▣',board.hostname||'本地主路由',model,firmware+' · '+lanSummary,L.url('admin/status/overview')));
+        if(channels.length){
+            path.push(E('div',{'class':'nv-fork','style':'height:'+Math.max(0,(channels.length-1)*75)+'px'},[el('span','','')]));
+            path.push(el('div','nv-path-channels',channels));
+            path.push(el('div','nv-branch-lines',channels.map(function(){return el('span','','');})));
+            path.push(el('div','nv-path-clients',clients));
+        }
+        var pathStats=[];
+        if(nets.length){
+            pathStats.push(el('div','',[label('客户端'),el('strong','',clientsKnown?String(totalClients):'—'),el('small','',clientsKnown?totalClients+' 个 Wi-Fi 已关联':'客户端信息不可用')]));
+            pathStats.push(el('div','',[label('无线频段'),el('strong','',visibleBands ? visibleBands+' 个已检测':'频段未知'),el('small','',nets.length+' 个无线配置')]));
+            pathStats.push(el('div','',[label('最弱信号'),el('strong','',worst!=null?worst+' dBm':'—'),el('small','',worst!=null?'来自已关联 Wi-Fi 客户端':'暂无客户端信号数据')]));
+        }
+        if(wan)pathStats.push(el('div','',[label('当前流量'),E('strong',{'data-nova':'path-flow'},!detected.interfaces?'状态未知':conn?'等待采样':'未连接'),el('small','',wanLabel(wan))]));
         var mainCard=el('section','nv-panel nv-topology',[
             el('div','nv-panel-head',[
                 el('div','nv-panel-title',[el('span','nv-head-icon','⌁'),el('strong','', '网络路径')]),
                 el('span','nv-muted','点击节点查看详情')
             ]),
             el('div','nv-path-scroll',[
-                el('div','nv-path',[
-                    node('nv-internet','◎','互联网',conn?ip:'WAN 未连接',
-                        'WAN '+(wanDev||'未检测')+' · IPv4 '+ip+' · DNS '+((wan&&wan['dns-server']||[]).join(', ')||'—'),L.url('admin/network/network')),
-                    el('div','nv-wireline',[
-                        E('strong',{'data-nova':'path-download'}, '↓ —'),
-                        E('small',{},wanDev||'WAN')
-                    ]),
-                    node('nv-router','▣',board.hostname||'本地主路由',model,
-                        firmware+' · '+lanSummary,L.url('admin/status/overview')),
-                    el('div','nv-fork', [el('span','', '')]),
-                    el('div','nv-path-channels',[
-                        node('nv-radio','◈','2.4 GHz',groups['2.4'].length?wifiSummary(groups['2.4']):'未检测到', 'Wi-Fi 2.4 GHz · '+wifiSummary(groups['2.4']),L.url('admin/network/wireless')),
-                        node('nv-radio nv-five','◈','5 GHz',groups['5'].length?wifiSummary(groups['5']):'未检测到','Wi-Fi 5 GHz · '+wifiSummary(groups['5']),L.url('admin/network/wireless')),
-                        node('nv-radio','▤','有线 LAN',lanDev||'未检测到 LAN 接口','有线设备数暂不可判定 · '+lanSummary,L.url('admin/network/network'))
-                    ]),
-                    el('div','nv-branch-lines',[el('span','', ''),el('span','', ''),el('span','', '')]),
-                    el('div','nv-path-clients',[
-                        node('nv-client','♧',groups['2.4'].length?groups['2.4'][0].net.getActiveSSID()||'2.4 GHz SSID':'2.4 GHz 无线',groupCount(groups['2.4'])+' 客户端','该频段关联客户端：'+groupCount(groups['2.4']),L.url('admin/status/overview')),
-                        node('nv-client','♧',groups['5'].length?groups['5'][0].net.getActiveSSID()||'5 GHz SSID':'5 GHz 无线',groupCount(groups['5'])+' 客户端','该频段关联客户端：'+groupCount(groups['5']),L.url('admin/status/overview')),
-                        node('nv-client','▤','LAN',lan.device||lanDev||'未检测到 LAN 接口','有线端口和设备详情请查看接口设置',L.url('admin/network/network'))
-                    ])
-                ])
+                el('div','nv-path'+(wan?'':' nv-no-wan')+(channels.length?'':' nv-no-branches'),path)
             ]),
             E('div',{'id':'nv-selected','class':'nv-node-detail','hidden':true}),
-            el('div','nv-path-stats',[
-                el('div','',[label('客户端'),el('strong','',String(totalClients)),el('small','',totalClients+' 个 Wi-Fi 已关联')]),
-                el('div','',[label('当前流量'),E('strong',{'data-nova':'path-flow'},'等待采样'),el('small','',wanDev ? '经 '+wanDev:'WAN 未检测')]),
-                el('div','',[label('无线频段'),el('strong','',visibleBands ? visibleBands+' 个已启用':'—'),el('small','',nets.length+' 个无线接口')]),
-                el('div','',[label('最弱信号'),el('strong','',worst!=null?worst+' dBm':'—'),el('small','',worst!=null?'来自已关联 Wi-Fi 客户端':'暂无客户端信号数据')])
-            ])
+            pathStats.length ? el('div','nv-path-stats',pathStats) : null
         ]);
         var header=el('div','nv-overview-head',[
-            el('span','nv-pulse',''),
+            el('span','nv-pulse'+(!conn||!detected.interfaces?' nv-inactive':''),''),
             el('div','nv-title-group',[
-                E('h2',{}, conn?'一切正常':'连接状态待检查'),
-                el('p','',model+' · '+firmware+' · '+totalClients+' 个无线客户端')
+                E('h2',{}, !detected.interfaces ? '接口状态暂不可用' : wan ? (conn?'上行链路已连接':'上行链路'+wanState(wan)) : '本地网络概览'),
+                el('p','',model+' · '+firmware+(nets.length?' · '+(clientsKnown?totalClients+' 个无线客户端':'无线客户端数不可用'):''))
             ]),
             E('span',{'class':'nv-updated'},[dot(),'实时 · 每 3 秒更新'])
         ]);
         var cards=el('div','nv-metric-grid',[
-            metric('上行链路',wanDev?'↓ 等待采样':'—',wanDev?'↑ 等待采样 · '+wanDev:'尚未发现活动 WAN','rate-down'),
+            wan ? metric('上行链路',!detected.interfaces?'状态未知':conn?'↓ 等待采样':status,wanLabel(wan)+(wanDev?' · '+wanDev:''),'rate-down') : null,
             metric('CPU', '等待采样', '负载 '+(sys.load&&sys.load.length?(number(sys.load[0])/65535).toFixed(2):'—')+(tempText?' · '+tempText:''),'cpu'),
             metric('内存',memPct!=null?'可用 '+(100-memPct)+'%':'—',mib(memUsed)+' / '+mib(mem.total),'memory'),
-            metric('Wi-Fi',visibleBands+' 个已启用',nets.length+' 个接口 · '+totalClients+' 个客户端','wifi'),
-            metric('信号强度',worst!=null?worst+' dBm':'暂无数据',worst!=null?(worst>=-75?'信号正常':'存在弱信号客户端'):'没有可用的客户端信号','signal'),
+            nets.length ? metric('Wi-Fi',visibleBands?visibleBands+' 个频段':'频段未知',nets.length+' 个无线配置 · '+(clientsKnown?totalClients+' 个客户端':'客户端数不可用'),'wifi') : null,
+            nets.length ? metric('信号强度',worst!=null?worst+' dBm':'暂无数据',worst!=null?(worst>=-75?'信号正常':'存在弱信号客户端'):'没有可用的客户端信号','signal') : null,
             metric('存储',diskPct!=null?'已用 '+diskPct+'%':'—',root.total?('剩余 '+Math.max(0,Math.round((root.total-root.used)/1024))+' MiB'):'无法获取根分区使用率','disk')
         ]);
         var trend=el('section','nv-panel nv-traffic',[
@@ -275,9 +372,9 @@ return view.extend({
             ]),
             el('div','nv-traffic-content',[
                 el('div','nv-traffic-numbers',[
-                    label('上行链路 '+(wanDev||'')),
-                    E('strong',{'data-nova':'traffic-down'},'等待采样'),
-                    E('span',{'data-nova':'traffic-up','class':'nv-upload-label'},'↑ 等待采样'),
+                    label(wan?wanLabel(wan):''),
+                    E('strong',{'data-nova':'traffic-down'},!detected.interfaces?'状态未知':conn?'等待采样':'未连接'),
+                    E('span',{'data-nova':'traffic-up','class':'nv-upload-label'},!detected.interfaces?'—':conn?'↑ 等待采样':'—'),
                     E('small',{},['峰值 ',E('span',{'data-nova':'traffic-peak'},'—')])
                 ]),
                 E('svg',{'class':'nv-traffic-chart','viewBox':'0 0 600 150','preserveAspectRatio':'none','role':'img','aria-label':'WAN 实时上下行速率'},[
@@ -290,8 +387,11 @@ return view.extend({
             ]),
             el('div','nv-chart-note','显示实际采样数据；尚未采样时不生成模拟曲线。')
         ]);
-        var bottom=el('div','nv-bottom-grid',[trend,wifiCard('2.4',groups['2.4']),wifiCard('5',groups['5'])]);
-        var root=E('div',{'class':'nova-dashboard'},[header,cards,mainCard,bottom]);
+        var panels=shownBands.map(function(band){return wifiCard(band,groups[band]);});
+        if(wan)panels.unshift(trend);
+        var bottom=panels.length ? el('div','nv-bottom-grid',panels) : null;
+        var notice=warnings.length ? E('p',{'class':'nv-detection-warning','role':'status'},warnings.join('；')+'。正在自动重试。') : null;
+        var root=E('div',{'class':'nova-dashboard'},[header,notice,cards,mainCard,bottom]);
         var styleHref=L.resource('nova/dashboard.css')+'?v='+dashboardAssetVersion;
         var style=document.getElementById('nova-dashboard-style');
         if(!style){
@@ -299,23 +399,56 @@ return view.extend({
         }else if(style.getAttribute('href')!==styleHref){
             style.setAttribute('href',styleHref);
         }
-        var self=this, prevSample=getCpuSample(cpuRaw), currentDown=null;
-        var wifiDevs={
-            '24':(firstNet(groups['2.4'])||{}).net,
-            '5':(firstNet(groups['5'])||{}).net
-        };
-        function update(){
+        var self=this, prevSample=this._novaCpuSample || getCpuSample(cpuRaw);
+        var wifiDevs=shownBands.map(function(band){return {id:band.replace('.',''),net:(firstNet(groups[band])||{}).net};});
+        // Compare display-relevant inventory only: uptime and byte counters must
+        // not rebuild the DOM every poll or interrupt an open detail/focus.
+        function signature(d){
+            return JSON.stringify({
+                interfaces:((d[2]||{}).interface||[]).map(function(n){return [n.interface,n.proto,n.up,n.pending,n.device,n.l3_device,n['ipv4-address'],n['ipv6-address'],n['dns-server'],defaultRoute(n)];}),
+                wireless:(d[3]||[]).map(function(n,i){return [n.getName(),n.getIfname(),n.getActiveSSID(),n.getFrequency(),n.getChannel(),n.getBand(),n.isUp(),n.isDisabled(),n.getTXPower(),n.getNoise(),(d[7]||[])[i]===null?null:((d[7]||[])[i]||[]).map(function(a){return [a.mac,a.signal];})];}),
+                detected:d[8]
+            });
+        }
+        var lastSignature=signature(data), updating=false;
+        function refresh(){
+            return readDetection().then(function(d){
+                var next=data.slice();
+                next[8]={interfaces:d[0]!==null,wireless:d[1]!==null};
+                if(d[0]!==null)next[2]=d[0];
+                if(d[1]!==null){next[9]=d[1];next[3]=wifiNetworks(d[1]);}
+                return readStations(next[3]).then(function(stations){
+                    next[7]=stations;
+                    if(!root.isConnected || self._novaPoll!==update)return false;
+                    if(signature(next)===lastSignature)return true;
+                    // Preserve selection/focus across a topology change. Never
+                    // re-use WAN rates after a PPP device/name switch.
+                    var selected=root.querySelector('.nv-node:focus');
+                    var detail=document.getElementById('nv-selected');
+                    var title=selected&&selected.getAttribute('data-nova-node');
+                    var detailKey=detail&&!detail.hidden&&detail.getAttribute('data-nova-node');
+                    var replacement=self.render(next);
+                    root.replaceWith(replacement);
+                    Array.prototype.forEach.call(replacement.querySelectorAll('.nv-node'),function(n){
+                        if(detailKey && n.getAttribute('data-nova-node')===detailKey)n.click();
+                        if(title && n.getAttribute('data-nova-node')===title)n.focus();
+                    });
+                    return self._novaSampleRates().then(function(){return false;});
+                });
+            });
+        }
+        function sampleRates(){
             var tasks=[
                 safe(getInfo(),{}),
                 safe(fs.read('/proc/stat'),null),
-                wanDev?safe(getRealtime('interface',wanDev),[]):Promise.resolve([])
+                conn&&wanDev&&detected.interfaces?safe(getRealtime('interface',wanDev),[]):Promise.resolve([])
             ];
-            ['24','5'].forEach(function(id){
-                var n=wifiDevs[id],ifname=n&&n.getIfname&&n.getIfname();
-                tasks.push(ifname?safe(getRealtime('interface',ifname),[]):Promise.resolve([]));
+            wifiDevs.forEach(function(item){
+                var n=item.net,ifname=n&&n.getIfname&&n.getIfname();
+                tasks.push(detected.wireless&&n.isUp()&&!n.isDisabled()&&ifname?safe(getRealtime('interface',ifname),[]):Promise.resolve([]));
             });
             return Promise.all(tasks).then(function(v){
-                if(!root.isConnected)return;
+                if(!root.isConnected || self._novaPoll!==update)return;
                 var info=v[0]||{},mem=info.memory||{},rootfs=info.root||{};
                 var sample=getCpuSample(v[1]);
                 if(sample&&prevSample&&sample.total>prevSample.total){
@@ -323,6 +456,7 @@ return view.extend({
                     attrValue(root.querySelector('[data-nova=cpu]'),Math.round(Math.max(0,Math.min(1,busy))*100)+'%');
                 }
                 prevSample=sample||prevSample;
+                self._novaCpuSample=prevSample;
                 if(mem.total){
                     var used=number(mem.total)-number(mem.available!=null?mem.available:mem.free);
                     attrValue(root.querySelector('[data-nova=memory]'),'可用 '+(100-percent(used,mem.total))+'%');
@@ -338,26 +472,37 @@ return view.extend({
                     var card=root.querySelector('[data-nova=rate-down]');
                     if(card&&card.nextSibling)card.nextSibling.textContent='↑ '+rate(lastUp)+' · '+wanDev;
                 }
-                fillChart(v[2],root.querySelector('[data-nova=down-path]'),root.querySelector('[data-nova=up-path]'),
+                if(conn && detected.interfaces)fillChart(v[2],root.querySelector('[data-nova=down-path]'),root.querySelector('[data-nova=up-path]'),
                     root.querySelector('[data-nova=traffic-down]'),root.querySelector('[data-nova=traffic-up]'),
                     root.querySelector('[data-nova=traffic-peak]'));
-                ['24','5'].forEach(function(id,i){
+                wifiDevs.forEach(function(item,i){
+                    var id=item.id;
                     var rows=parseGraphRows(v[3+i]);
                     var all=rows.down.concat(rows.up);
                     var p=Math.max(1024,Math.max.apply(Math,all.concat([0]))*1.2);
                     var pl=root.querySelector('[data-nova=wifi-'+id+']');
                     if(pl)pl.setAttribute('points',points(rows.down,p,360,65));
                     var last=rows.down.length ? rows.down[rows.down.length-1] : null;
-                    attrValue(root.querySelector('[data-nova=wifi-rate-'+id+']'),last!=null?'↓ '+rate(last):'等待采样');
+                    attrValue(root.querySelector('[data-nova=wifi-rate-'+id+']'),last!=null?'↓ '+rate(last):!detected.wireless?'检测失败':item.net.isUp()?'等待采样':'接口未连接');
                 });
             });
         }
+        function update(){
+            if(updating || !root.isConnected || self._novaPoll!==update)return Promise.resolve();
+            updating=true;
+            return refresh().then(function(unchanged){if(unchanged)return sampleRates();}).finally(function(){updating=false;});
+        }
+        if(this._novaPoll)poll.remove(this._novaPoll);
+        this._novaSampleRates=sampleRates;
         this._novaPoll=update;
         poll.add(update,3);
         return root;
     },
     remove:function(){
         if(this._novaPoll)poll.remove(this._novaPoll);
+        this._novaPoll=null;
+        this._novaCpuSample=null;
+        this._novaSampleRates=null;
     },
     handleSaveApply:null, handleSave:null,handleReset:null
 });

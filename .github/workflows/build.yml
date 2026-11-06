@@ -27,14 +27,17 @@ jobs:
         run: |
           node --check luci-app-nova-dashboard/htdocs/luci-static/resources/view/nova/dashboard.js
           node --check luci-theme-nova/htdocs/luci-static/nova/nova-shell.js
+          node --check luci-theme-nova/htdocs/luci-static/nova/nova-lists.js
       - name: Test dashboard rendering
-        run: node --test tests/dashboard.test.js
+        run: node --test tests/dashboard.test.js tests/native-lists.test.js
       - name: Test asset cache versions
         env:
           NOVA_ASSET_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: node --test tests/asset-version.test.js
       - name: Test dashboard and navigation layout in Chrome
         run: node --test tests/browser-layout.test.js
+      - name: Test native overview and connection lists in Chrome
+        run: node --test tests/native-lists-browser.test.js
       - name: Test click-only menu interactions in Chrome
         run: node --test tests/navigation-browser.test.js
       - name: Build from matching OpenWrt SDK

@@ -1,0 +1,56 @@
+# Native LuCI overview compatibility inventory
+
+Audited against `openwrt/luci`, branch `openwrt-25.12`, on 2026-11-06. This is source inspection, not a live-router test. The branch can change.
+
+## Native sections to preserve
+
+The [include directory](https://github.com/openwrt/luci/tree/openwrt-25.12/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include) contains these eight modules. Installed add-ons can contribute additional includes, so enhancements must leave unknown sections intact.
+
+- **10_system.js / System:** hostname, model, architecture, target platform, firmware and LuCI versions, kernel version, localized local time, uptime, and three load averages. Sources: system board/info, LuCI version/time, system UCI time preferences.
+- **20_memory.js / Memory:** available and used RAM, conditional buffered/cached RAM, and free swap when configured. Native progress bars retain used/total/percentage titles. Source: system info.
+- **25_storage.js / Storage:** disk space, temporary space, and every additional mount except native exclusions `/rom`, `/tmp`, `/dev`, `/overlay`, `/`. Extra rows include device and mount path. Sources: system info and LuCI mount points. Do not reduce this to only a root filesystem gauge.
+- **29_ports.js / Port status:** built-in Ethernet ports, with board.json fallback; link state, speed/duplex, RX/TX totals, network and firewall-zone membership, detailed traffic/error/drop/multicast/collision tooltips, and supported PoE status/power/class/limit. Sources include built-in port inventory, board.json, network/firewall/UCI state, and network device PSE status. Native module is omitted with swconfig.
+- **30_network.js / Network:** each IPv4/IPv6 upstream's protocol, delegated prefixes, addresses, gateway, DNS, expiry, connection uptime, device/MAC, plus DHCPv6 packet statistics where available; active connection count/max progress bar. Sources: WAN/WAN6 network state, conntrack proc files, and odhcp6c statistics. These upstream boxes are not client lists.
+- **40_dhcp.js / DHCP Leases:** native IPv4 and IPv6 lease tables with host hints, optional interfaces, identifiers, expiry, optional MAC vendor, and permission-gated Reserve IP actions. Sources: DHCP leases, host hints, optional fingerprint service, DHCP UCI state. Omitted without dnsmasq/odhcpd. If both families have no leases, renders only the native empty message, not tables.
+- **50_dsl.js / DSL:** line state/mode/uptime and downstream/upstream data rate and noise margin. Sources: modem type and DSL metrics. Rendered only with available DSL state; container ID `dsl_status_table`.
+- **60_wifi.js / Wireless:** all radio and network summaries (radio type, bitrate, channel/frequency, country, noise, TX power, SSID, mode, BSSID, encryption, association count, signal/quality, WPS state/actions), followed by permission-gated Associated Stations. Sources: Wi-Fi devices/networks/associations, host hints, session access checks, firewall zones, wireless UCI, and conditional WPS status. Omitted if no radio cards exist.
+
+## Client table contracts
+
+- `table#status_leases.table.leases`: optional Interface, Hostname, IPv4 address, MAC address (possibly vendor), DUID, IAID, Remaining time, optional Static Lease action. The action is a live button with a bound native handler and disabled state for an existing reservation. Read-only views omit the action header/buttons.
+- `table#status_leases6.table.leases6`: optional Interface, Hostname, IPv6 addresses (potentially multiple lines), DUID, IAID, Remaining time, optional Static Lease action. Reservation availability depends on DUID and existing DUID/IAID reservations.
+- `table#wifi_assoclist_table.table.assoclist`: Network (including interface/SSID data attributes and optional VLAN zone badge), MAC address, Host (possibly IPv4 and IPv6 hints), Signal / Noise (including tooltip and data attributes), RX Rate / TX Rate with detailed modulation metadata, and conditional Disconnect or native combo action. Combo actions can add to allow/block lists as well as disconnect. Read permission controls whether the table exists; write permission and driver support control actions.
+
+Rows are native `.tr` elements and title rows use `.table-titles`. Keep original table nodes, row nodes, event listeners, tooltips, attributes, controls, permissions, and native empty states. Do not assume fixed column offsets because Interface and action columns are conditional. Search can use text content, including responsive-hidden address text; no additional RPC or access grants are necessary. Lease row counts are lease counts, not authoritative unique/online device counts.
+
+## Refresh and visibility lifecycle
+
+The [overview controller](https://github.com/openwrt/luci/blob/openwrt-25.12/modules/luci-mod-status/htdocs/luci-static/resources/view/status/index.js) is `index.js`, not `overview.js` (audited blob `75f5ccb40779c18b8731f64308e605308e6e9b6c`). It discovers every installed JavaScript include, sorts filenames, and loads them dynamically.
+
+Each module owns a persistent outer `.cbi-section`, a `.cbi-title` with its native Show/Hide control, and a persistent inner content container. On each visible module poll, `network.flushCache()` precedes module loading/rendering, and `dom.content(container, content)` replaces the container's entire descendants. Table references and controls inside that content are therefore transient. The poll interval comes from LuCI's poll defaults; this controller does not specify a fixed interval.
+
+Native section visibility is persisted in localStorage using the translated section title. Hidden modules are loaded on the first pass but their content is not inserted; subsequent polls skip their load and render. Showing a module replaces its content with “Collecting data...” until a later poll. Failed includes are skipped. Preserve these behaviors rather than replacing native section controls.
+
+For theme-only client grouping, identify the three exact table IDs, preserve per-table query/open state outside the replaced subtree, and reapply enhancement to fresh tables. Default-collapse individual client groups without hiding radio summaries or other overview modules. Keep group collapse separate from native module Hide, because native Hide pauses updates. A stable adjacent toolbar can retain input focus during polling; a toolbar recreated inside native content needs explicit focus/selection restoration. Guard observers against their own DOM writes and duplicate wrappers/listeners. Preserve native tables and actions by moving/wrapping nodes, never serializing/rebuilding them.
+
+## Verification cases
+
+Test consecutive full native content replacements; empty-to-populated and populated-to-empty transitions; IPv4-only and IPv6-only leases; multiple IPv6 addresses; optional Interface columns; read-only access; disabled reservations; Wi-Fi combo actions and absent permissions; filter no matches; collapse/reopen with query retained; input focus during polling; native module Hide/Show; non-English headings; and unknown add-on sections. Verify every storage mount row and radio summary remains available.
+
+Source blob identifiers for the eight includes, in order: `3a2d2f1f2f1060606905daafb2b7e9d2ab213fd0`, `0a885c01c9b45e296f4fb1cacf0cde30fa2e086d`, `60661f63e51ddb6b8e098d242df016538f35276e`, `9ff30bb473d408408a842b1f5ce2940d95cb6178`, `723b73d43d413a01fc031f3f236bd49aec2fce58`, `7be0eb9046c919230f5f8f99773fc567eef91979`, `3482a9fd084bb2249030492f819a5a50076a3ea2`, `96a9eece87d908607d537dc975665ce65b133589`.
+
+## Nova enhancement scope
+
+The Nova theme enhances the existing **Status → Overview** page rather than replacing its renderer. The original eight sections, additional plugin sections, all storage mount rows, permissions, native module Show/Hide controls, and routing remain owned by LuCI. The separate Nova dashboard remains optional and is not a complete replacement for the native overview.
+
+- IPv4 and IPv6 DHCP lease groups are collapsed initially, with native headings, separate counts, and a shared local search. Wi-Fi association details have their own collapsed searchable group; radio summaries stay visible. Counts describe rows/leases/associations, not verified unique online users.
+- Each expanded table displays 25 rows per page. Search scans all existing rows, including every supplied IPv6 address and native identifiers. Search/open/page state lasts only for the current page, survives ordinary native polling, and is not persisted or sent elsewhere.
+- **Status → Realtime Graphs → Connections** keeps its native graph, native filter and DNS controls. A collapsed paginated table adds IPv4/IPv6/Other selection and local search. This remains the separate native connection route; no additional conntrack RPC is added to the homepage. Counts reflect rows currently provided by native LuCI, including any native filter already in effect.
+- Existing elements are moved, never cloned or converted back from strings. Reserve IP, disconnect, native combo menus, disabled states and permission-gated actions remain unchanged. No additional RPC, analytics, stored client data or ACL privileges are introduced.
+- On small screens, native columns are retained inside a keyboard-focusable horizontal scroller. Other native overview data is not compacted away. Unsupported or renamed tables remain in their original form.
+
+## Test scope and remaining integration checks
+
+`node --test tests/native-lists.test.js` covers shipped filter/pagination behavior with DOM doubles, including 5,000 records, multiple addresses, literal HTML-looking names, empty states and connection families. `CHROME_BIN=google-chrome node --test tests/native-lists-browser.test.js` exercises a native-shaped local fixture, real keyboard disclosure, repeated script loading, same-task polling/toggle races, native row-update/sort patterns, focus retention, module Hide/Show, read-only rows and responsive widths.
+
+These fixtures are not a live router or the complete Bootstrap/LuCI runtime. The browser test includes Nova CSS and structural table rules, not a vendored Bootstrap stylesheet. A passing fixture does not verify firmware-specific third-party includes, live ACL responses, the installed Bootstrap mobile styles, or real native combo-menu positioning. Verify those on a supported OpenWrt/ImmortalWrt APK installation before treating the change as production-ready.

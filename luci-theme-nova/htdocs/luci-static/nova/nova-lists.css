@@ -1,0 +1,24 @@
+/* Native overview data stays in LuCI's own modules; only long lists are condensed. */
+.nova-list-tools{display:flex;align-items:flex-end;flex-wrap:wrap;gap:10px;margin:12px 0;max-width:100%}
+.nova-list-search{display:flex;flex-direction:column;gap:5px;flex:1 1 240px;min-width:0;max-width:480px;font-size:12px}
+.nova-list-search input{width:100%;min-width:0;box-sizing:border-box}
+.nova-list-note{flex:1 1 280px;color:#a6aab5;font-size:12px;line-height:1.5}
+.nova-list-family{display:flex;align-items:center;gap:8px}
+.nova-list-group{border:1px solid #303640;border-radius:9px;background:#12151a;margin:10px 0;min-width:0}
+.nova-list-summary{cursor:pointer;list-style:disclosure-closed;padding:13px;color:#edf0f4;line-height:1.5}
+.nova-list-group[open]>.nova-list-summary{list-style-type:disclosure-open;border-bottom:1px solid #303640}
+.nova-list-summary .nova-list-title{display:inline!important;font-size:14px;margin:0 8px!important;padding:0}
+.nova-list-badge{display:inline-block;background:#26321c;color:#c9f354;border-radius:5px;padding:1px 7px;font-size:12px;margin-left:5px}
+.nova-list-count{display:inline-block;border-radius:12px;padding:1px 8px;background:#2a2f38;color:#d9dee6;font-size:12px;font-variant-numeric:tabular-nums}
+.nova-list-body{padding:10px;min-width:0}
+.nova-list-scroll{max-width:100%;overflow:auto;overscroll-behavior:contain}
+.nova-list-scroll>.table{min-width:660px;width:100%;margin:0}
+.nova-list-scroll .nova-list-hidden{display:none!important}
+.nova-list-pager{display:flex;align-items:center;justify-content:flex-end;gap:12px;margin-top:12px;flex-wrap:wrap}
+.nova-list-range{font-variant-numeric:tabular-nums;color:#b8bec9}
+.nova-list-empty{padding:12px;color:#b8bec9}
+.nova-list-tools button:focus-visible,.nova-list-summary:focus-visible,.nova-list-scroll:focus-visible,.nova-list-pager button:focus-visible{outline:2px solid #c5ef4d;outline-offset:2px}
+.nova-list-pager[hidden],.nova-list-empty[hidden]{display:none!important}
+/* Keep columns on phones inside a horizontal scroller, rather than dropping data. */
+.nova-list-scroll .hide-xs{display:revert!important}
+@media(max-width:600px){.nova-list-summary{padding:11px 8px}.nova-list-tools{gap:8px}.nova-list-note{flex-basis:100%}.nova-list-body{padding:7px}.nova-list-search{max-width:none}.nova-list-scroll>.table{font-size:12px}}
