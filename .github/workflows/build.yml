@@ -20,10 +20,12 @@ jobs:
             sdk: '24.10.8'
             arch: 'x86_64'
             ext: ipk
+            package_separator: '_'
           - series: '25.12'
             sdk: '25.12.6'
             arch: 'x86_64'
             ext: apk
+            package_separator: '-'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -44,6 +46,6 @@ jobs:
         with:
           name: luci-nova-${{ matrix.series }}-${{ matrix.ext }}
           path: |
-            bin/packages/**/luci-theme-nova-*.${{ matrix.ext }}
-            bin/packages/**/luci-app-nova-dashboard-*.${{ matrix.ext }}
+            bin/packages/**/luci-theme-nova${{ matrix.package_separator }}*.${{ matrix.ext }}
+            bin/packages/**/luci-app-nova-dashboard${{ matrix.package_separator }}*.${{ matrix.ext }}
           if-no-files-found: error
