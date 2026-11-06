@@ -102,8 +102,26 @@ test('native lists preserve modules/actions, grouping, focus, polling and bounde
         }
         async function input(value) {
             await evaluate(`(()=>{const q=document.getElementById('nova-search-leases');q.value=${JSON.stringify(value)};q.dispatchEvent(new Event('input',{bubbles:true}));})()`);
-            await delay(170);
+            await until(`['status_leases','status_leases6'].every(id=>{
+                const table=document.getElementById(id), group=table && table.closest('details.nova-list-group');
+                if(!group)return false;
+                const rows=Array.from(table.querySelectorAll('tr[data-index]'));
+                const tokens=${JSON.stringify(value.trim().toLowerCase().split(/\s+/).filter(Boolean))};
+                const matches=rows.filter(row=>tokens.every(token=>row.textContent.toLowerCase().includes(token)));
+                const expected=matches.length===rows.length?String(rows.length):matches.length+' / '+rows.length;
+                const shown=rows.filter(row=>!row.classList.contains('nova-list-hidden'));
+                return group.querySelector('.nova-list-count').textContent===expected &&
+                    shown.length===Math.min(matches.length,25) && shown.every((row,i)=>row===matches[i]);
+            })`);
         }
+        // JSON encoding quotes numeric CSS attribute values and the enclosing JS
+        // string separately, avoiding invalid selectors and nested-quote mistakes.
+        const leaseRow = index => `document.querySelector(${JSON.stringify(`#status_leases tr[data-index="${index}"]`)})`;
+        const leasesReady = count => until(`(()=>{
+            const table=document.getElementById('status_leases');
+            return table && table.closest('details.nova-list-group') &&
+                table.querySelectorAll('tr[data-index]').length===${count};
+        })()`);
         const visible = id => evaluate(`document.querySelectorAll('#${id} tr:not(.table-titles):not(.placeholder):not(.nova-list-hidden)').length`);
         await send('Page.navigate', { url });
         await until('document.querySelectorAll(".nova-list-group").length === 3');
@@ -135,49 +153,52 @@ test('native lists preserve modules/actions, grouping, focus, polling and bounde
         await until('document.getElementById("status_leases").closest("details").open && document.querySelector("[data-nova-list-focus=status_leases-summary]").getAttribute("aria-expanded") === "true"');
         assert.equal(await evaluate('window.nativeKeyEvents.some(event=>event.type==="keypress" && event.key==="Enter" && event.trusted)'), true);
         assert.equal(await evaluate('document.querySelector("[data-nova-list-focus=status_leases-summary]").getAttribute("aria-expanded")'), 'true');
-        await evaluate('document.querySelector("#status_leases tr[data-index=0] button").click()');
+        await evaluate(`${leaseRow(0)}.querySelector('button').click()`);
         assert.equal(await evaluate('window.actionCount'), 1);
-        assert.equal(await evaluate('document.querySelector("#status_leases tr[data-index=1] button").disabled'), true);
+        assert.equal(await evaluate(`${leaseRow(1)}.querySelector('button').disabled`), true);
         await evaluate('document.querySelector("[data-nova-list-focus=status_leases-next]").click()');
-        await until('document.querySelector("#status_leases tr[data-index=25]").classList.contains("nova-list-hidden") === false');
+        await until(`${leaseRow(25)}.classList.contains('nova-list-hidden') === false`);
         await input('HOST-78');
         assert.equal(await visible('status_leases'), 1);
         assert.equal(await visible('status_leases6'), 0);
         await input('host-7 192.0.2.7');
         assert.equal(await visible('status_leases'), 11);
         await evaluate('document.getElementById("nova-search-leases").focus();document.getElementById("nova-search-leases").setSelectionRange(2,5);window.beforeInput=document.activeElement;pollLeases(100)');
-        await until('document.querySelector("#status_leases tr[data-index=99]") !== null && document.querySelectorAll(".nova-list-group").length===3');
+        await leasesReady(100);
+        await until('document.querySelector("#status_leases").closest("details").querySelector(".nova-list-count").textContent === "11 / 100"');
         assert.equal(await evaluate('document.activeElement === window.beforeInput'), true);
         assert.equal(await evaluate('document.activeElement.selectionStart'), 2);
         assert.equal(await evaluate('document.getElementById("status_leases").closest("details").open'), true);
         assert.equal(await visible('status_leases'), 11);
         // Poll in the same task, before the asynchronous details toggle event.
         await evaluate('document.getElementById("status_leases").closest("details").open=false;pollLeases(100)');
-        await until('document.querySelector("#status_leases tr[data-index=99]") !== null');
+        await leasesReady(100);
         assert.equal(await evaluate('document.getElementById("status_leases").closest("details").open'), false);
         await evaluate('document.getElementById("status_leases").closest("details").open=true;pollLeases(100)');
-        await delay(50);
+        await leasesReady(100);
         assert.equal(await evaluate('document.getElementById("status_leases").closest("details").open'), true);
         await input('missing-device');
         assert.equal(await visible('status_leases'), 0);
         assert.equal(await evaluate('document.getElementById("status_leases").closest("details").querySelector(".nova-list-empty").hidden'), false);
         await input('');
         // Empty/no-permission transitions do not fabricate clients or discard state.
-        await evaluate('pollLeases(-1)'); await delay(50);
+        await evaluate('pollLeases(-1)');
+        await until('document.querySelectorAll("#leases-content .nova-list-group").length === 0 && !document.getElementById("status_leases")');
         assert.equal(await evaluate('document.querySelectorAll("#leases-content .nova-list-group").length'), 0);
         await evaluate('pollLeases(0)');
+        await leasesReady(0);
         await until('document.querySelector("#status_leases .placeholder") !== null');
         assert.equal(await evaluate('document.querySelector("#status_leases .placeholder").classList.contains("nova-list-hidden")'), false);
         await evaluate('pollLeases(60,true)');
-        await until('document.querySelector("#status_leases tr[data-index=59]") !== null');
+        await leasesReady(60);
         assert.equal(await evaluate('document.querySelectorAll("#status_leases button").length'), 0);
         // Native module hide and unknown add-on content remain functional.
         await evaluate('document.getElementById("native-hide").click()');
         assert.equal(await evaluate('document.getElementById("leases-content").style.display'), 'none');
         await evaluate('document.getElementById("native-hide").click()');
-        await until('document.querySelector("#status_leases tr[data-index=80]") !== null');
+        await leasesReady(81);
         // HTML-looking client names stay text, and polling stays local.
-        await evaluate('document.querySelector("#status_leases tr[data-index=0] td").textContent="<img src=x onerror=alert(1)>"'); await delay(50);
+        await evaluate(`${leaseRow(0)}.querySelector('td').textContent='<img src=x onerror=alert(1)>'`);
         await input('<img'); assert.equal(await visible('status_leases'), 1);
         assert.equal(await evaluate('document.querySelectorAll("#status_leases img").length'), 0);
         await input('');
@@ -196,7 +217,7 @@ test('native lists preserve modules/actions, grouping, focus, polling and bounde
         assert.equal(await evaluate('window.requests'), 0);
         if (process.env.NOVA_QA_DIR) {
             fs.mkdirSync(process.env.NOVA_QA_DIR, { recursive: true });
-            await input(''); await evaluate('pollLeases(81)'); await delay(80);
+            await input(''); await evaluate('pollLeases(81)'); await leasesReady(81);
             await send('Emulation.setDeviceMetricsOverride', { width: 1180, height: 900, deviceScaleFactor: 1, mobile: false });
             const shot = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true });
             fs.writeFileSync(path.join(process.env.NOVA_QA_DIR, 'native-overview-lists.png'), Buffer.from(shot.data, 'base64'));
@@ -207,9 +228,11 @@ test('native lists preserve modules/actions, grouping, focus, polling and bounde
         assert.equal(await evaluate('document.querySelector(".nova-list-group").open'), false);
         assert.equal(await evaluate('!!document.getElementById("filter-connections") && !!document.getElementById("lookup")'), true);
         await evaluate('const s=document.querySelector(".nova-list-family select");s.value="ipv6";s.dispatchEvent(new Event("change"))');
+        await until('document.querySelector(".nova-list-count").textContent === "33 / 99"');
         assert.equal(await visible('connections'), 25);
         assert.equal(await evaluate('Array.from(document.querySelectorAll("#connections tr:not(.table-titles):not(.nova-list-hidden)")).every(r=>r.firstChild.textContent==="IPv6")'), true);
         await evaluate('document.querySelector(".nova-list-family select").value="other";document.querySelector(".nova-list-family select").dispatchEvent(new Event("change"))');
+        await until('Array.from(document.querySelectorAll("#connections tr[data-index]:not(.nova-list-hidden)")).every(row=>row.firstChild.textContent==="OTHER")');
         assert.equal(await evaluate('document.querySelector(".nova-list-count").textContent'), '33 / 99');
         // Native UI.Table updates and sorting reuse the original table element.
         await evaluate('window.savedConnections=document.getElementById("connections");const fresh=makeTable("connections",7);window.savedConnections.replaceChildren(...fresh.childNodes)');
@@ -217,7 +240,7 @@ test('native lists preserve modules/actions, grouping, focus, polling and bounde
         assert.equal(await evaluate('window.savedConnections === document.getElementById("connections")'), true);
         assert.equal(await evaluate('document.querySelectorAll(".nova-list-group").length'), 1);
         await evaluate('const head=window.savedConnections.firstElementChild;head.addEventListener("click",()=>{Array.from(window.savedConnections.children).slice(1).reverse().forEach(r=>window.savedConnections.append(r))});head.click()');
-        await delay(40);
+        await until('document.querySelector("#connections tr[data-index]:not(.nova-list-hidden)").getAttribute("data-index") === "5"');
         assert.equal(await evaluate('document.querySelector(".nova-list-count").textContent'), '2 / 7');
         assert.equal(await evaluate('document.querySelector("#connections tr:not(.table-titles):not(.nova-list-hidden)").getAttribute("data-index")'), '5');
         // Repeated script loads/navigation must not enhance arbitrary config pages.
