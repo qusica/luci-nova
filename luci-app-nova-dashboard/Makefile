@@ -4,7 +4,7 @@ LUCI_TITLE:=Nova Status Dashboard
 LUCI_DEPENDS:=+luci-base
 PKG_LICENSE:=MIT
 PKG_VERSION:=0.2.0
-PKG_RELEASE:=1
+PKG_RELEASE:=2
 
 include $(TOPDIR)/feeds/luci/luci.mk
 

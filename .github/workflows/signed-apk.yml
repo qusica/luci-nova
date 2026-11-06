@@ -33,6 +33,10 @@ jobs:
         run: |
           node --check luci-app-nova-dashboard/htdocs/luci-static/resources/view/nova/dashboard.js
           node --check luci-theme-nova/htdocs/luci-static/nova/nova-shell.js
+      - name: Test dashboard rendering
+        run: node --test tests/dashboard.test.js
+      - name: Test dashboard and navigation layout in Chrome
+        run: node --test tests/browser-layout.test.js
       - name: Build unsigned APKs without access to signing credentials
         uses: openwrt/gh-action-sdk@f5813d30eeef3534b58ac7e79c5d8842b6035434
         env:
