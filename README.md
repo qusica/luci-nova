@@ -20,7 +20,11 @@ One source tree supports both package managers via the matching OpenWrt SDK:
 
 ImmortalWrt support depends on its actual LuCI/API and package-manager version; the target should be built against a compatible SDK. File extensions are *not* interchangeable.
 
-The GitHub Actions workflow builds both `24.10` IPK and `25.12` APK artifacts. Both Lua/ucode templates and static browser resources are platform-independent; the packages are intended for the `all` architecture.
+GitHub Actions currently builds `25.12` APK artifacts only. Automatic IPK builds
+are paused until feature development is complete; the source still supports
+building IPK manually with a matching SDK. Both Lua/ucode templates and static
+browser resources are platform-independent; the packages are intended for the
+`all` architecture.
 
 ## Install
 
@@ -31,10 +35,19 @@ For **opkg**:
 opkg install /tmp/luci-theme-nova_*.ipk /tmp/luci-app-nova-dashboard_*.ipk
 ```
 
-For **apk** (locally-built, unsigned packages only):
+For **apk**, once both packages are individually signed and the reviewed
+publisher key is trusted by your router:
 ```sh
-apk add --allow-untrusted /tmp/luci-theme-nova-*.apk /tmp/luci-app-nova-dashboard-*.apk
+apk add /tmp/luci-theme-nova-*.apk /tmp/luci-app-nova-dashboard-*.apk
 ```
+
+The ordinary CI APK artifacts are unsigned. LuCI upload verifies package
+signatures and will reject them. The separate **Build signed APK packages**
+workflow signs automatically on main updates and v* tags, after its repository
+secret and reviewed public-key fingerprint are configured. Missing configuration
+fails closed. Pull-request tests only use disposable keys: never install a
+`TEST-ONLY-*` key on your router. See [signing setup](docs/apk-signing.md) for the
+required one-time setup and separate approval before changing router trust.
 
 The theme **does not become the default automatically**. Switch in LuCI under System → System → Language and Style (wording varies by firmware), or via UCI after checking the registered theme name.
 
@@ -96,3 +109,4 @@ and reload the browser without cached assets. SSH rollback remains available abo
 - Vantage is an independent UI; Nova uses LuCI's default menu and forms under the hood.
 - A full port-level Ethernet client topology and live spectrum-quality indicators are not yet implemented.
 - Live traffic sampling may be unavailable on some devices or locked-down accounts.
+

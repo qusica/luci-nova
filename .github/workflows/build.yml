@@ -1,8 +1,5 @@
-name: Build IPK and APK
+name: Build APK
 on:
-  push:
-    branches: [main]
-    tags: ['v*']
   pull_request:
   workflow_dispatch:
 
@@ -16,14 +13,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - series: '24.10'
-            sdk: '24.10.8'
-            arch: 'x86_64'
-            ext: ipk
+          # IPK builds are paused until feature development is complete.
           - series: '25.12'
             sdk: '25.12.6'
             arch: 'x86_64'
             ext: apk
+            package_separator: '-'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -44,6 +39,34 @@ jobs:
         with:
           name: luci-nova-${{ matrix.series }}-${{ matrix.ext }}
           path: |
-            bin/packages/**/luci-theme-nova-*.${{ matrix.ext }}
-            bin/packages/**/luci-app-nova-dashboard-*.${{ matrix.ext }}
+            bin/packages/**/luci-theme-nova${{ matrix.package_separator }}*.${{ matrix.ext }}
+            bin/packages/**/luci-app-nova-dashboard${{ matrix.package_separator }}*.${{ matrix.ext }}
           if-no-files-found: error
+      - name: Install host APK build dependencies (test only)
+        if: matrix.ext == 'apk'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends build-essential meson ninja-build pkg-config libssl-dev zlib1g-dev libzstd-dev
+      - name: Build pinned host APK tool (test only)
+        if: matrix.ext == 'apk'
+        run: bash scripts/build-host-apk.sh "$RUNNER_TEMP/nova-host-apk"
+      - name: Test individual APK signatures with disposable keys
+        if: matrix.ext == 'apk'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -d '' themes < <(find bin/packages -type f -name 'luci-theme-nova-*.apk' -print0)
+          mapfile -d '' dashboards < <(find bin/packages -type f -name 'luci-app-nova-dashboard-*.apk' -print0)
+          test "${#themes[@]}" -eq 1
+          test "${#dashboards[@]}" -eq 1
+          bash scripts/test-apk-signing.sh "$RUNNER_TEMP/nova-host-apk/build/src/apk" \
+            "${themes[0]}" "${dashboards[0]}" "$RUNNER_TEMP/nova-test-signed"
+      - name: Upload TEST ONLY signed APKs and disposable public key
+        if: matrix.ext == 'apk'
+        uses: actions/upload-artifact@v4
+        with:
+          name: TEST-ONLY-luci-nova-${{ matrix.series }}-signed-apk
+          path: ${{ runner.temp }}/nova-test-signed/
+          if-no-files-found: error
+          retention-days: 7
+
