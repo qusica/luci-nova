@@ -17,17 +17,21 @@ test('dashboard grids and narrow navigation render in Chromium', () => {
     const dashboard = fs.readFileSync(path.join(root, 'luci-app-nova-dashboard/htdocs/luci-static/resources/nova/dashboard.css'), 'utf8');
     const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'nova-layout-'));
     try {
+        fs.writeFileSync(path.join(temporary, 'dashboard.css'), dashboard);
+        fs.writeFileSync(path.join(temporary, 'old-dashboard.css'), '.nova-dashboard .nova-grid{display:grid}');
+        const dashboardUrl = pathToFileURL(path.join(temporary, 'dashboard.css')).href;
         const child = `<!doctype html><meta charset="utf-8">
 <style>body{margin:0}ul{list-style:none}#topmenu{position:relative}.dropdown-menu{list-style:none}a{cursor:pointer}</style>
-<style>${theme}\n${dashboard}</style>
-<!-- The actual stylesheet was inlined above; prevent a synthetic network request. -->
-<link id="nova-dashboard-style" rel="stylesheet">
+<style>${theme}</style>
+<!-- Simulate a stylesheet left behind by the previous dashboard view. -->
+<link id="nova-dashboard-style" rel="stylesheet" href="old-dashboard.css">
 <header><a class="brand"><span class="nova-brand-mark">N</span><span>Nova</span></a>
 <ul id="topmenu"><li><a>仪表盘</a></li><li class="dropdown open"><a>状态</a><ul class="dropdown-menu" id="status-menu">
 ${['概览','路由表','防火墙','内核日志','进程','实时信息'].map(name => '<li><a>'+name+'</a></li>').join('')}
 </ul></li><li><a>系统</a></li><li><a>网络</a></li><li><a>退出</a></li></ul></header>
 <div class="nova-topbar">Local fixture</div><div id="maincontent" class="container"></div>
 <script>
+(async function(){
 try {
     const svgTags=['svg','line','polyline'];
     function E(tag,attrs={},children=[]) {
@@ -42,11 +46,18 @@ try {
     }
     const app=new Function('view','rpc','poll','network','fs','E','L','document',${JSON.stringify(source)})(
         {extend:x=>x},{declare:()=>()=>Promise.resolve({})},{add:()=>{},remove:()=>{}},{},{},E,
-        {url:x=>'/cgi-bin/luci/'+x,resource:x=>'/luci-static/resources/'+x},document);
+        {url:x=>'/cgi-bin/luci/'+x,resource:x=>${JSON.stringify(dashboardUrl)}},document);
+    const stylesheet=document.getElementById('nova-dashboard-style');
+    const styleLoaded=new Promise((resolve,reject)=>{
+        stylesheet.addEventListener('load',resolve,{once:true});
+        stylesheet.addEventListener('error',()=>reject(new Error('versioned dashboard CSS failed to load')),{once:true});
+    });
     document.getElementById('maincontent').append(app.render([
         {hostname:'local-fixture',release:{description:'OpenWrt fixture'}},{},{interface:[]},[],{},null,null,[]
     ]));
+    await styleLoaded;
     function check(condition,message){if(!condition)throw new Error(message);}
+    check(stylesheet.getAttribute('href')===${JSON.stringify(dashboardUrl)}+'?v=0.2.1','stale CSS link was not upgraded');
     const width=window.innerWidth;
     const expected=width>1350?6:width>780?3:width>530?2:1;
     const grid=getComputedStyle(document.querySelector('.nv-metric-grid'));
@@ -69,8 +80,9 @@ try {
     }else{
         check(getComputedStyle(header).overflowY==='auto','desktop sidebar must remain scrollable');
     }
-    parent.postMessage({width,passed:true,columns:expected},'*');
+    parent.postMessage({width,passed:true,columns:expected,stylesheetUpgraded:true},'*');
 }catch(error){parent.postMessage({width:innerWidth,passed:false,error:error.message},'*');}
+})();
 </script>`;
         fs.writeFileSync(path.join(temporary, 'frame.html'), child);
         const frame = pathToFileURL(path.join(temporary, 'frame.html')).href;
