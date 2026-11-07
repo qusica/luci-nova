@@ -27,7 +27,7 @@ jobs:
         run: |
           mkdir -p "$XDG_CACHE_HOME/fontconfig"
           fc-cache
-          node --test --test-concurrency=1 tests/browser-layout.test.js tests/navigation-browser.test.js tests/native-lists-browser.test.js tests/visual-browser.test.js
+          node --test --test-concurrency=1 tests/browser-layout.test.js tests/navigation-browser.test.js tests/native-lists-browser.test.js tests/visual-browser.test.js tests/native-spacing-browser.test.js
       - name: Upload synthetic design review screenshots
         if: always()
         uses: actions/upload-artifact@v4

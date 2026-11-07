@@ -34,7 +34,7 @@ a:hover{color:var(--nova-accent-hover)}
 header{
  box-sizing:border-box;
  position:fixed;z-index:100;inset:0 auto 0 0;width:232px;height:100vh;
- display:flex;flex-direction:column;padding:0 8px 14px;
+ display:flex;flex-direction:column;margin:0;padding:0 8px 14px;
  border-right:1px solid var(--nova-border-soft);background:var(--nova-sidebar);
  box-shadow:none;overflow-y:auto;
 }
@@ -126,7 +126,7 @@ header .brand:hover{color:#fff;text-decoration:none}
 #tabmenu{border:1px solid var(--nova-border);border-radius:9px;background:var(--nova-surface);padding:6px}
 .cbi-map,.cbi-section,.panel,.modal,.table{border-color:var(--nova-border-soft);background:var(--nova-surface);
  border-radius:9px}
-.cbi-section{padding:12px}
+.cbi-section{padding:20px;margin:0 0 16px;min-width:0}
 .cbi-section-node{background:transparent}
 h1,h2,h3,h4,h5,legend{color:var(--nova-text)}
 .cbi-map-descr,.cbi-section-descr{color:var(--nova-muted)}
@@ -210,6 +210,68 @@ button:disabled,.cbi-button:disabled{cursor:not-allowed}
 .cbi-section>h3{font-size:15px;font-weight:650}
 .cbi-value{border-color:var(--nova-border-soft)}
 .cbi-value-description{color:var(--nova-muted)}
+/* One spacing system for native pages, not a second layout engine. Keep
+ * LuCI's tables, joined widgets, dependency visibility and tab handlers. */
+#tabmenu{margin-bottom:20px}
+#tabmenu .tabs{margin-bottom:0}
+.cbi-map{padding:20px;margin:0 0 20px;min-width:0}
+.cbi-map>h2,#view>h2{margin:0 0 8px;line-height:1.35}
+.cbi-map-descr,.cbi-section-descr{margin:0 0 20px;line-height:1.6}
+.cbi-map-descr:empty,.cbi-section-descr:empty{margin:0}
+.cbi-section>h3,.cbi-section>legend{margin:0 0 12px;padding:0;line-height:1.45}
+.cbi-map>.cbi-section,.cbi-map>.cbi-map-tabbed>.cbi-section,
+.cbi-section .cbi-section{padding:0;background:transparent}
+.cbi-section:last-child{margin-bottom:0}
+.cbi-map-tabbed{margin-bottom:16px}
+.cbi-tab-descr{margin:0 0 16px;line-height:1.6}
+.cbi-value{margin-bottom:16px;min-width:0}
+.cbi-value:last-child{margin-bottom:0}
+.cbi-value> .cbi-value-field{min-width:0}
+.cbi-value-field>input,.cbi-value-field>select,.cbi-value-field>textarea,
+.cbi-value-field>.control-group,.cbi-value-field>.cbi-dynlist,
+.cbi-value-field>.cbi-dropdown,.cbi-value-field>.cbi-select{
+ box-sizing:border-box;max-width:100%
+}
+.cbi-value-description{margin-top:6px;line-height:1.6}
+/* A native line break separates a readout from its actions (system clock).
+ * Do not introduce a gap inside input + reveal/add buttons. */
+.cbi-value-field>br+.control-group{
+ display:inline-flex;flex-wrap:wrap;gap:8px;margin-top:8px;height:auto;width:auto;max-width:100%
+}
+.cbi-value-field>br+.control-group>.cbi-button{max-width:100%;white-space:normal}
+.cbi-section-create{flex-wrap:wrap;gap:8px;margin:12px 0 0;padding:0}
+.cbi-section-create>*{margin:0;max-width:100%}
+.cbi-page-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:center;gap:8px;
+ margin:20px 0 0;padding:16px;border-radius:9px;background:var(--nova-raised)}
+.cbi-page-actions::after{display:none}
+.cbi-page-actions>*{float:none!important;margin:0!important;max-width:100%}
+.cbi-page-actions>.cbi-button{white-space:normal}
+.cbi-page-actions>.cbi-button-neutral{margin-right:auto!important}
+.table .td,.table .th{overflow-wrap:anywhere}
+/* Package versions and generated names can otherwise dictate the whole
+ * document width. Let this native list wrap without hiding any column. */
+#packages .td.version,#packages .td.size{white-space:normal}
+#content_syslog>textarea#syslog[readonly]{box-sizing:border-box;width:100%;min-height:240px;max-height:60vh;overflow:auto;resize:vertical}
+.td.cbi-section-actions>div:not(.cbi-dropdown){flex-wrap:wrap;gap:6px}
+.td.cbi-section-actions>div:not(.cbi-dropdown)>*{margin:0}
+.modal .cbi-map{padding:0;margin-bottom:16px;background:transparent}
+.modal>h4{margin-bottom:16px;line-height:1.45}
+/* Bootstrap collapses inactive panels with height, not display. Padding and
+ * margins on an inactive section must not leave phantom rows below its tab. */
+[data-tab-title]:not([data-tab-active="true"]){padding:0!important;margin:0!important;border-width:0!important;min-height:0!important}
+@media(max-width:640px){
+ .cbi-map,.cbi-section{padding:16px}
+ .cbi-map>.cbi-section,.cbi-map>.cbi-map-tabbed>.cbi-section,.cbi-section .cbi-section{padding:0}
+ .cbi-value{display:block;margin-bottom:16px;padding-bottom:0;border-bottom:0}
+ .cbi-value.hidden{display:none}
+ .cbi-value label.cbi-value-title{display:block;text-align:left;padding:0;margin-bottom:6px;line-height:1.5}
+ .cbi-value>.cbi-value-field{margin-left:0;width:100%}
+ .cbi-value-field>.control-group{height:auto;min-height:30px}
+ .cbi-value-field>.control-group>input{min-width:0;flex:1 1 auto}
+ .cbi-value-field>.control-group>.cbi-button{flex:0 0 auto}
+ .cbi-value-field>.cbi-dynlist,.cbi-value-field>.cbi-dropdown{min-width:0}
+ .cbi-page-actions{padding:12px}
+}
 .table .tr.table-titles,.table .tr.cbi-section-table-titles{background:var(--nova-raised);color:var(--nova-muted)}
 .table .tr:hover{background-color:rgba(155,193,241,.04)}
 footer{font-size:11px;line-height:1.6}
@@ -218,7 +280,7 @@ footer{font-size:11px;line-height:1.6}
  /* Horizontal navigation uses pop-out menus, not the desktop scroll container. */
  header{position:relative;width:100%;height:auto;min-height:0;padding:0 10px 10px;border-right:0;border-bottom:1px solid var(--nova-border-soft);
   box-sizing:border-box;overflow:visible}
- header .brand{width:calc(100% + 20px);margin:0 0 8px -10px}
+ header .brand{display:flex!important;width:calc(100% + 20px);margin:0 0 8px -10px}
  #topmenu{flex-direction:row;flex-wrap:wrap;gap:3px}
  #topmenu>li{width:auto}
  #topmenu>li>a{padding:7px 10px;font-size:12px;min-height:35px}

@@ -5,7 +5,7 @@
 'require fs';
 
 // Keep in sync with PKG_VERSION; tests enforce this cache key on every release.
-var dashboardAssetVersion = '0.2.8';
+var dashboardAssetVersion = '0.2.9';
 
 var getBoard = rpc.declare({ object: 'system', method: 'board' });
 var getInfo = rpc.declare({ object: 'system', method: 'info' });

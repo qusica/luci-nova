@@ -3,7 +3,7 @@ include $(TOPDIR)/rules.mk
 LUCI_TITLE:=Nova Dark LuCI Theme
 LUCI_DEPENDS:=+luci-base +luci-theme-bootstrap
 PKG_LICENSE:=MIT AND Apache-2.0
-PKG_VERSION:=0.2.8
+PKG_VERSION:=0.2.9
 PKG_RELEASE:=1
 
 # The SDK csstidy optimizer corrupts merged rules in our modern CSS. Keep
