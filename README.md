@@ -2,7 +2,7 @@
 
 Nova is a dark LuCI theme and a companion status dashboard for OpenWrt and ImmortalWrt.
 
-> Preview 0.2.5: detected interface cards, live PPPoE status and searchable native LuCI lists. This is still experimental and has not been tested on every router or firmware. Keep Bootstrap installed for safe rollback.
+> Preview 0.2.6: detected interface cards, live PPPoE status and searchable native LuCI lists. This is still experimental and has not been tested on every router or firmware. Keep Bootstrap installed for safe rollback.
 
 ## Packages
 
@@ -124,6 +124,15 @@ rejects that mistake. To run the same comparison locally, set
 
 Project-authored files: MIT. Templates adapted from the LuCI Bootstrap theme retain their upstream Apache-2.0 notices.
 
+## What's new in 0.2.6
+
+- **Quiet Slate:** a unified graphite and ice-blue visual system across navigation, native LuCI forms, the dashboard, lists and the favicon. Mint indicates live activity, amber marks warnings, and lavender distinguishes uploads. No fluorescent lime accents remain.
+- Larger tabular metrics, clearer secondary labels, calmer borders and a more spacious header improve long-session readability. Consistent decorative line icons replace the misleading checkmarks previously shown beside every metric.
+- Keyboard focus remains visible. Download/upload charts also differ by line pattern, not color alone. Existing detected-interface data, native actions, menu interactions, list search and pagination are unchanged.
+- A dedicated secret-free visual review checks 320/390/768/1024/1440 px layouts, key small-text contrast, unknown-state cards and decorative SVG accessibility. Screenshots use **synthetic test data**, not router telemetry. The same browser test is run against the minified APK assets.
+
+See [visual design notes](docs/visual-design.md) for palette, semantics and acceptance boundaries.
+
 ## What's new in 0.2.5
 
 - Consistent line icons identify menu categories by their LuCI route, so translating, hiding or reordering categories cannot change their meaning. Dashboard uses tiles, Status uses an activity trace, System uses a gear, Network uses a connected topology, and Logout uses an exit arrow.
@@ -169,7 +178,7 @@ Detection uses strict `network.interface dump` and `network.wireless status` rea
 
 ### Updating an existing installation
 
-Make sure to download the fresh 0.2.3 packages from a **successful** CI run.
+Make sure to download the fresh 0.2.6 packages from a **successful** CI run.
 Install both packages again using your device's normal package-manager update/upgrade procedure,
 and reload the browser without cached assets. SSH rollback remains available above.
 

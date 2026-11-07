@@ -5,7 +5,7 @@
 'require fs';
 
 // Keep in sync with PKG_VERSION; tests enforce this cache key on every release.
-var dashboardAssetVersion = '0.2.5';
+var dashboardAssetVersion = '0.2.6';
 
 var getBoard = rpc.declare({ object: 'system', method: 'board' });
 var getInfo = rpc.declare({ object: 'system', method: 'info' });
@@ -172,9 +172,30 @@ function children(contents) {
     return Array.isArray(contents) ? contents.filter(function(child) { return child != null; }) : contents;
 }
 function el(kind, klass, contents){return E(kind, {'class':klass}, children(contents));}
+// All dashboard ornaments use one line-icon family. They are decorative, not
+// health checks: unavailable CPU/storage/network data must never get a checkmark.
+function icon(kind) {
+    var paths = {
+        cpu:['7,7 17,7 17,17 7,17 7,7','10,10 14,10 14,14 10,14 10,10','9,3 9,7','15,3 15,7','9,17 9,21','15,17 15,21','3,9 7,9','3,15 7,15','17,9 21,9','17,15 21,15'],
+        memory:['3,7 21,7 21,17 3,17 3,7','7,10 7,14','11,10 11,14','15,10 15,14','7,17 7,20','12,17 12,20','17,17 17,20'],
+        disk:['5,4 19,4 21,15 21,20 3,20 3,15 5,4','3,15 21,15','16,18 18,18'],
+        wifi:['2,8 6,5 12,3 18,5 22,8','5,12 8,9 12,8 16,9 19,12','9,16 12,14 15,16','12,20 12,20'],
+        signal:['4,19 4,16','9,19 9,12','14,19 14,8','19,19 19,4'],
+        'rate-down':['8,3 8,20 3,15','8,20 13,15','16,21 16,4 11,9','16,4 21,9'],
+        router:['4,11 20,11 21,20 3,20 4,11','7,11 5,3','17,11 19,3','7,16 7,16','11,16 11,16','15,16 17,16'],
+        lan:['4,7 20,7 20,20 4,20 4,7','8,7 8,3 16,3 16,7','8,11 8,15','12,11 12,15','16,11 16,15'],
+        client:['3,4 21,4 21,16 3,16 3,4','8,21 16,21','12,16 12,21'],
+        internet:['4,7 8,3 16,3 20,7 21,12 20,17 16,21 8,21 4,17 3,12 4,7','3,12 21,12','12,3 8,8 8,16 12,21 16,16 16,8 12,3'],
+        path:['3,5 9,5 9,11 3,11 3,5','15,13 21,13 21,19 15,19 15,13','6,11 6,16 15,16','18,13 18,8 9,8'],
+        activity:['2,13 6,13 9,5 14,20 17,10 19,13 22,13']
+    };
+    return E('svg', {'class':'nv-icon','viewBox':'0 0 24 24','fill':'none','stroke':'currentColor',
+        'stroke-width':'1.6','stroke-linecap':'round','stroke-linejoin':'round','aria-hidden':'true','focusable':'false'},
+        (paths[kind] || paths.activity).map(function(points){return E('polyline',{'points':points});}));
+}
 function metric(name,value,detail,key){
     return el('div','nv-metric',[
-        el('span','nv-metric-icon', '✓'),
+        el('span','nv-metric-icon', icon(key)),
         el('div','nv-metric-main',[
             el('div','nv-metric-label',name),
             E('strong',key ? {'data-nova':key} : {},value),
@@ -183,7 +204,7 @@ function metric(name,value,detail,key){
     ]);
 }
 function detailLine(a,b){return el('span','nv-detail-line',[label(a),el('strong','',b)]);}
-function node(klass,icon,name,sub,details,target) {
+function node(klass,iconKind,name,sub,details,target) {
     return E('button',{
         'class':'nv-node '+klass,'type':'button','data-nova-node':klass.split(' ')[0]+'|'+name,
         'title':details,
@@ -200,7 +221,7 @@ function node(klass,icon,name,sub,details,target) {
             }
         }
     },[
-        el('span','nv-node-icon',icon),
+        el('span','nv-node-icon',icon(iconKind)),
         el('span','nv-node-text',[el('strong','nv-truncate',name),el('small','nv-truncate',sub)])
     ]);
 }
@@ -378,22 +399,22 @@ return view.extend({
         var channels=[], clients=[];
         shownBands.forEach(function(band){
             var group=groups[band], title=bandName(band);
-            channels.push(node('nv-radio'+(band==='5'?' nv-five':''),'◈',title,wifiState(group),
+            channels.push(node('nv-radio'+(band==='5'?' nv-five':''),'wifi',title,wifiState(group),
                 title+' · '+wifiSummary(group),L.url('admin/network/wireless')));
-            clients.push(node('nv-client','♧',firstNet(group).net.getActiveSSID() || title,
+            clients.push(node('nv-client','client',firstNet(group).net.getActiveSSID() || title,
                 clientSummary(group),'该频段关联'+clientSummary(group),L.url('admin/status/overview')));
         });
         if(hasLan){
-            channels.push(node('nv-radio','▤','有线 LAN',lanDev || (detected.interfaces?'未连接':'状态未知'),'有线设备数暂不可判定 · '+lanSummary,L.url('admin/network/network')));
-            clients.push(node('nv-client','▤','LAN',lan.device||lanDev||(detected.interfaces?'未连接':'状态未知'),'有线端口和设备详情请查看接口设置',L.url('admin/network/network')));
+            channels.push(node('nv-radio','lan','有线 LAN',lanDev || (detected.interfaces?'未连接':'状态未知'),'有线设备数暂不可判定 · '+lanSummary,L.url('admin/network/network')));
+            clients.push(node('nv-client','lan','LAN',lan.device||lanDev||(detected.interfaces?'未连接':'状态未知'),'有线端口和设备详情请查看接口设置',L.url('admin/network/network')));
         }
         var path=[];
         if(wan){
-            path.push(node('nv-internet'+(conn?'':' nv-inactive'),'◎',wanLabel(wan),status+(conn?' · '+(ip==='—'?getAddress(wan,true):ip):''),
+            path.push(node('nv-internet'+(conn?'':' nv-inactive'),'internet',wanLabel(wan),status+(conn?' · '+(ip==='—'?getAddress(wan,true):ip):''),
                 wanLabel(wan)+' · '+status+' · 设备 '+(wanDev||'尚未建立')+' · IPv4 '+ip+' · IPv6 '+getAddress(wan,true)+' · DNS '+((wan['dns-server']||[]).join(', ')||'—'),L.url('admin/network/network')));
             path.push(el('div','nv-wireline'+(conn?'':' nv-inactive'),[E('strong',{'data-nova':'path-download'},!detected.interfaces?'状态未知':conn?'↓ 等待采样':'未连接'),E('small',{},wanDev||wan.interface)]));
         }
-        path.push(node('nv-router','▣',board.hostname||'本地主路由',model,firmware+' · '+lanSummary,L.url('admin/status/overview')));
+        path.push(node('nv-router','router',board.hostname||'本地主路由',model,firmware+' · '+lanSummary,L.url('admin/status/overview')));
         if(channels.length){
             path.push(E('div',{'class':'nv-fork','style':'height:'+Math.max(0,(channels.length-1)*75)+'px'},[el('span','','')]));
             path.push(el('div','nv-path-channels',channels));
@@ -409,7 +430,7 @@ return view.extend({
         if(wan)pathStats.push(el('div','',[label('当前流量'),E('strong',{'data-nova':'path-flow'},!detected.interfaces?'状态未知':conn?'等待采样':'未连接'),el('small','',wanLabel(wan))]));
         var mainCard=el('section','nv-panel nv-topology',[
             el('div','nv-panel-head',[
-                el('div','nv-panel-title',[el('span','nv-head-icon','⌁'),el('strong','', '网络路径')]),
+                el('div','nv-panel-title',[el('span','nv-head-icon',icon('path')),el('strong','', '网络路径')]),
                 el('span','nv-muted','点击节点查看详情')
             ]),
             el('div','nv-path-scroll',[
@@ -436,7 +457,7 @@ return view.extend({
         ]);
         var trend=el('section','nv-panel nv-traffic',[
             el('div','nv-panel-head',[
-                el('div','nv-panel-title',[el('span','nv-head-icon','⌁'),el('strong','', '吞吐量'),el('span','nv-muted','实时采集 · WAN 接口')]),
+                el('div','nv-panel-title',[el('span','nv-head-icon',icon('activity')),el('strong','', '吞吐量'),el('span','nv-muted','实时采集 · WAN 接口')]),
                 el('div','nv-legend',[el('span','nv-legend-down','下载'),el('span','nv-legend-up','上传')])
             ]),
             el('div','nv-traffic-content',[

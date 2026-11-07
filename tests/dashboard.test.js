@@ -373,11 +373,30 @@ test('read-only ACL covers strict inventories and no router configuration writes
 
 test('versioned stylesheet is upgraded once; render and remove maintain one poll',async()=>{
     const app=harness();await app.render();assert.equal(app.polls.size,1);
-    const style=app.document.head.children[0];assert.equal(style.attrs.href,'/luci-static/resources/nova/dashboard.css?v=0.2.5');
+    const style=app.document.head.children[0];assert.equal(style.attrs.href,'/luci-static/resources/nova/dashboard.css?v=0.2.6');
     assert.ok(fs.statSync(path.join(resources,'nova/dashboard.css')).size>0);
     for(const old of ['','?v=0.2.2']){
         app.view.remove();style.attrs.href='/luci-static/resources/nova/dashboard.css'+old;
-        await app.render();assert.equal(app.document.head.children.length,1);assert.match(style.attrs.href,/\?v=0\.2\.5$/);assert.equal(app.polls.size,1);
+        await app.render();assert.equal(app.document.head.children.length,1);assert.match(style.attrs.href,/\?v=0\.2\.6$/);assert.equal(app.polls.size,1);
     }
     app.view.remove();assert.equal(app.polls.size,0);
+});
+
+test('dashboard icons are decorative semantic SVGs, never health checkmarks', async () => {
+    const app = harness();
+    await app.render();
+    const metrics = all(app.root, hasClass('nv-metric'));
+    assert.equal(metrics.length, 3);
+    const icons = all(app.root, hasClass('nv-icon'));
+    assert.ok(icons.length >= 5);
+    for (const icon of icons) {
+        assert.equal(icon.tag, 'svg');
+        assert.equal(icon.attrs['aria-hidden'], 'true');
+        assert.equal(icon.attrs.focusable, 'false');
+        assert.equal(icon.attrs.viewBox, '0 0 24 24');
+        assert.equal(text(icon), '');
+    }
+    const metricIcons = metrics.map(metric => all(metric, hasClass('nv-icon'))[0]);
+    assert.equal(new Set(metricIcons.map(icon => JSON.stringify(icon.children.map(child => child.attrs.points)))).size, 3);
+    assert.ok(!text(app.root).includes('✓'));
 });

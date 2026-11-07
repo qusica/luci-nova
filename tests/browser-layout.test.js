@@ -71,7 +71,7 @@ try {
         {url:x=>'/cgi-bin/luci/'+x,resource:x=>${JSON.stringify(dashboardUrl)}},document);
     const data=await app.load();
     const stylesheet=document.getElementById('nova-dashboard-style');
-    const expectedHref=${JSON.stringify(dashboardUrl)}+'?v=0.2.5';
+    const expectedHref=${JSON.stringify(dashboardUrl)}+'?v=0.2.6';
     const styleLoaded=new Promise((resolve,reject)=>{
         function loaded(){
             if(stylesheet.getAttribute('href')===expectedHref && stylesheet.sheet && stylesheet.sheet.href===expectedHref){
@@ -84,7 +84,7 @@ try {
     document.getElementById('maincontent').append(app.render(data));
     await styleLoaded;
     function check(condition,message){if(!condition)throw new Error(message);}
-    check(stylesheet.getAttribute('href')===${JSON.stringify(dashboardUrl)}+'?v=0.2.5','stale CSS link was not upgraded');
+    check(stylesheet.getAttribute('href')===${JSON.stringify(dashboardUrl)}+'?v=0.2.6','stale CSS link was not upgraded');
     check(!/null|undefined/.test(document.querySelector('.nova-dashboard').textContent),'conditional DOM entries leaked literal null/undefined');
     const width=window.innerWidth;
     const expected=scenario==='dual'||scenario==='configured'?6:scenario==='disabled'?5:scenario==='pppoe'?4:3;

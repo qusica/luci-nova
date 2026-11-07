@@ -1,46 +1,54 @@
-/* Nova 0.2 shell — based on the stock LuCI bootstrap theme. */
+/* Nova 0.2.6 · Quiet Slate. Native LuCI remains the interaction layer.
+ * Shared tokens keep the shell, forms and optional dashboard in one palette. */
 :root, :root[data-darkmode="true"] {
- --background-color-h:225; --background-color-s:10%; --background-color-l:6%;
+ --nova-canvas:#101419; --nova-sidebar:#141a21; --nova-surface:#19212a;
+ --nova-raised:#202a35; --nova-border:#303d4c; --nova-border-soft:#293440;
+ --nova-text:#e9eef5; --nova-muted:#a6b3c2; --nova-subtle:#96a5b6;
+ --nova-accent:#9bc1f1; --nova-accent-hover:#bed8fa; --nova-accent-soft:#24364b;
+ --nova-success:#83cbb2; --nova-success-soft:#203b35;
+ --nova-warning:#e3bf86; --nova-warning-soft:#322c23; --nova-upload:#b9abe9;
+ --background-color-h:213; --background-color-s:22%; --background-color-l:8%;
  --background-color-delta-l-sign:1;
- --text-color-h:220; --text-color-s:12%; --text-color-l:94%;
+ --text-color-h:215; --text-color-s:38%; --text-color-l:94%;
  --text-color-delta-l-sign:-1;
- --border-color-h:220; --border-color-s:12%; --border-color-l:20%;
+ --border-color-h:214; --border-color-s:23%; --border-color-l:24%;
  --border-color-delta-l-sign:1;
- --primary-color-high:#c5f236; --primary-color-medium:#b1dc2c; --primary-color-low:#92b828;
- --on-primary-color:#0e1208;
- --background-color-high:#0b0c0e;
- --background-color-medium:#14161b;
- --background-color-low:#17191e;
- --border-color-low:#272b33;
- --text-color-high:#f0f1f4;
- --text-color-medium:#a6aab5;
- --text-color-low:#747b88;
+ --primary-color-high:var(--nova-accent); --primary-color-medium:#8ab2e6; --primary-color-low:#6e99ce;
+ --on-primary-color:#112339;
+ --background-color-high:var(--nova-canvas);
+ --background-color-medium:var(--nova-surface);
+ --background-color-low:var(--nova-raised);
+ --border-color-low:var(--nova-border-soft);
+ --text-color-high:var(--nova-text);
+ --text-color-medium:var(--nova-muted);
+ --text-color-low:var(--nova-subtle);
  color-scheme:dark;
 }
-*{scrollbar-color:#393d44 #121317;}
+*{scrollbar-color:#435366 var(--nova-sidebar);}
 html{min-height:100%}
-body{padding:0;min-height:100vh;display:block;background:#0b0c0e;color:#eceef3;
+body{margin:0;padding:0;min-height:100vh;display:block;background:var(--nova-canvas);color:var(--nova-text);
  font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
- font-size:13px;}
-a{color:#b9e73a}
-a:hover{color:#d1fb66}
+ font-size:13px;line-height:1.55;}
+a{color:var(--nova-accent)}
+a:hover{color:var(--nova-accent-hover)}
 header{
+ box-sizing:border-box;
  position:fixed;z-index:100;inset:0 auto 0 0;width:232px;height:100vh;
  display:flex;flex-direction:column;padding:0 8px 14px;
- border-right:1px solid #25272c;background:#101113;
+ border-right:1px solid var(--nova-border-soft);background:var(--nova-sidebar);
  box-shadow:none;overflow-y:auto;
 }
 header .brand{
- width:calc(100% + 16px);margin:0 0 9px -8px;padding:8px 12px;
- min-height:51px;display:flex;align-items:center;gap:12px;
- color:#f4f5f6;font-size:15px;font-weight:750;letter-spacing:.1px;
- text-decoration:none;border-bottom:1px solid #272a30;
+ box-sizing:border-box;width:calc(100% + 16px);margin:0 0 9px -8px;padding:8px 12px;
+ min-height:64px;display:flex;align-items:center;gap:12px;
+ color:var(--nova-text);font-size:15px;font-weight:650;letter-spacing:.1px;
+ text-decoration:none;border-bottom:1px solid var(--nova-border-soft);
 }
 header .brand:hover{color:#fff;text-decoration:none}
 .nova-brand-mark{width:33px;height:33px;display:grid;place-items:center;flex:none;
- color:#c8f852;background:#191b1e;border:1px solid #333841;
+ color:var(--nova-accent-hover);background:var(--nova-accent-soft);border:1px solid #3a5069;
  border-radius:10px;font-size:21px;font-weight:800}
-.nova-brand-name{font-weight:750}
+.nova-brand-name{font-weight:650}
 .nova-hostname{display:none}
 #topmenu{display:flex!important;flex-direction:column;align-items:stretch;
  width:100%;padding:0;margin:0;gap:3px;background:transparent;box-shadow:none;
@@ -48,9 +56,9 @@ header .brand:hover{color:#fff;text-decoration:none}
 #topmenu>li{float:none;display:block;position:relative;width:100%;
  margin:0;padding:0;border:0}
 #topmenu>li>a{
- position:relative;display:flex;align-items:center;min-height:43px;
+ position:relative;display:flex;align-items:center;min-height:44px;
  margin:0;padding:10px 12px;border:0;border-radius:8px;
- color:#aeb3be;background:transparent;font-size:14px;font-weight:550;
+ color:var(--nova-muted);background:transparent;font-size:14px;font-weight:550;
  line-height:21px;text-decoration:none;box-shadow:none;white-space:normal;
 }
 /* SVGs avoid font-dependent glyph sizes and do not enter accessible names. */
@@ -66,7 +74,7 @@ header .brand:hover{color:#fff;text-decoration:none}
 #topmenu>li>a.menu[aria-expanded="true"]::after{margin-top:-1px;transform:rotate(225deg)}
 #topmenu>li.active>a,#topmenu>li>a:hover,
 #topmenu>li.dropdown.open>a,#topmenu>li.nova-search-result>a:focus{
- color:#c5ef4d;background:#252c1b;
+ color:var(--nova-accent-hover);background:var(--nova-accent-soft);
 }
 #topmenu .dropdown-menu{
  position:static!important;display:none;visibility:visible;float:none;
@@ -74,68 +82,90 @@ header .brand:hover{color:#fff;text-decoration:none}
  background:none;border:0;box-shadow:none;transform:none;
 }
 #topmenu>li.open>.dropdown-menu{display:block}
-#topmenu a:focus-visible{outline:2px solid #c5ef4d;outline-offset:-2px}
+#topmenu a:focus-visible{outline:2px solid var(--nova-accent-hover);outline-offset:-2px}
 #topmenu .dropdown-menu a{
  display:block;border-radius:6px;padding:7px 12px 7px 42px;
  box-sizing:border-box;white-space:normal;overflow-wrap:anywhere;text-shadow:none;
- color:#a7adb9;background:transparent;font-size:12px;
+ color:var(--nova-muted);background:transparent;font-size:12px;
 }
-#topmenu .dropdown-menu a:hover,#topmenu .dropdown-menu li.active>a{background:#242a1c;color:#c8f24b}
+#topmenu .dropdown-menu a:hover,#topmenu .dropdown-menu li.active>a{background:var(--nova-accent-soft);color:var(--nova-accent-hover)}
 .nova-sidebar-foot{margin-top:auto;padding:16px 12px 3px;font-size:11px;
- color:#727986;border-top:1px solid #272a2f}
-.nova-footer-dot{color:#bbeb3c;font-size:8px;margin-right:7px}
+ color:var(--nova-subtle);border-top:1px solid var(--nova-border-soft)}
+.nova-footer-dot{color:var(--nova-success);font-size:8px;margin-right:7px}
 .nova-topbar{
- position:fixed;z-index:90;inset:0 0 auto 232px;height:51px;padding:0 25px 0 20px;
+ box-sizing:border-box;
+ position:fixed;z-index:90;inset:0 0 auto 232px;height:64px;padding:0 28px 0 24px;
  display:flex;align-items:center;justify-content:space-between;gap:15px;
- background:#0c0d0f;border-bottom:1px solid #282b31;
+ background:var(--nova-canvas);border-bottom:1px solid var(--nova-border-soft);
 }
-.nova-current-page{font-size:13px;color:#f2f3f4;font-weight:600;white-space:nowrap}
+.nova-current-page{font-size:13px;color:var(--nova-text);font-weight:600;white-space:nowrap}
 .nova-top-actions{display:flex;align-items:center;gap:9px;min-width:0}
-.nova-search-wrap{display:flex;align-items:center;gap:9px;width:250px;height:34px;
- padding:0 11px;border:1px solid #393e47;border-radius:8px;background:#17191e;
- color:#838a98;font-size:21px;box-shadow:none}
+.nova-search-wrap{display:flex;align-items:center;gap:9px;width:250px;height:34px;box-sizing:border-box;
+ padding:0 11px;border:1px solid var(--nova-border);border-radius:8px;background:var(--nova-surface);
+ color:var(--nova-subtle);font-size:21px;box-shadow:none}
 .nova-search-wrap input{width:100%;height:28px;line-height:28px;padding:0;
- border:0!important;outline:none;color:#dae0e7!important;
+ border:0!important;outline:none;color:var(--nova-text)!important;
  background:transparent!important;box-shadow:none!important;font-size:12px}
-.nova-search-wrap input::placeholder{color:#858b98}
-.nova-search-wrap:focus-within{border-color:#a1c536}
+.nova-search-wrap input::placeholder{color:var(--nova-subtle)}
+.nova-search-wrap:focus-within{border-color:var(--nova-accent)}
 .nova-refresh,.nova-device{
- height:32px;border:1px solid #2c3038;border-radius:18px;
+ height:34px;border:1px solid var(--nova-border);border-radius:9px;
  display:flex;align-items:center;gap:7px;padding:0 12px;
- background:#17191e;color:#c8cbd2;font-size:12px;white-space:nowrap}
-.nova-refresh:hover{color:#d6fc6f;border-color:#5b7135;background:#23291b}
-.nova-refresh span{color:#b6e235;font-size:18px}
+ background:var(--nova-surface);color:var(--nova-muted);font-size:12px;white-space:nowrap}
+.nova-refresh:hover{color:var(--nova-accent-hover);border-color:#587aa4;background:var(--nova-accent-soft)}
+.nova-refresh span{color:var(--nova-accent);font-size:18px}
 .nova-device{max-width:315px;overflow:hidden;text-overflow:ellipsis;display:block;
- line-height:30px}
-.nova-live-dot{color:#c5ee4c;font-size:10px;margin-right:7px}
-#indicators{position:static;float:none;flex:none;color:#a8afba}
+ line-height:32px}
+.nova-live-dot{color:var(--nova-success);font-size:10px;margin-right:7px}
+#indicators{position:static;float:none;flex:none;color:var(--nova-muted)}
 #maincontent.container{
- width:auto;max-width:none;margin:0 0 0 232px;padding:75px 25px 30px;
- background:#0b0c0e;min-height:calc(100vh - 56px);
+ width:auto;max-width:none;margin:0 0 0 232px;padding:92px 28px 36px;
+ background:var(--nova-canvas);min-height:calc(100vh - 56px);
 }
 #maincontent.container #view{min-width:0}
-#tabmenu{border:1px solid #2a2e35;border-radius:9px;background:#15171b;padding:6px}
-.cbi-map,.cbi-section,.panel,.modal,.table{border-color:#2a2d34;background:#15171b;
+#tabmenu{border:1px solid var(--nova-border);border-radius:9px;background:var(--nova-surface);padding:6px}
+.cbi-map,.cbi-section,.panel,.modal,.table{border-color:var(--nova-border-soft);background:var(--nova-surface);
  border-radius:9px}
 .cbi-section{padding:12px}
 .cbi-section-node{background:transparent}
-h1,h2,h3,h4,h5,legend{color:#e9ebee}
-.cbi-map-descr,.cbi-section-descr{color:#a0a6b1}
+h1,h2,h3,h4,h5,legend{color:var(--nova-text)}
+.cbi-map-descr,.cbi-section-descr{color:var(--nova-muted)}
 input,select,textarea,.cbi-dropdown:not(.btn):not(.cbi-button){
- color:#e5e8ee!important;border:1px solid #383d45!important;
- border-radius:7px!important;background:#191c22!important
+ color:var(--nova-text)!important;border:1px solid #45576c!important;
+ border-radius:7px!important;background:var(--nova-sidebar)!important
 }
 .btn,.cbi-button,button{border-radius:7px}
 .btn.primary,.cbi-button-positive,.cbi-button-apply{
- background:#c3ec43!important;color:#141912!important;border-color:#b9e13b!important
+ background:var(--nova-accent)!important;color:#112339!important;border-color:var(--nova-accent)!important
 }
-footer{margin-left:232px;padding:14px 25px;border-top:1px solid #24272d;
- color:#777d88;background:#0d0e11}
-footer a{color:#a5c45f}
+footer{margin-left:232px;padding:14px 25px;border-top:1px solid var(--nova-border-soft);
+ color:var(--nova-subtle);background:var(--nova-canvas)}
+footer a{color:var(--nova-muted)}
+/* Native forms stay recognizable. Never hide a control or status indicator. */
+button,input,select,textarea{font:inherit}
+input[type="checkbox"],input[type="radio"]{accent-color:var(--nova-accent)}
+a,button,input,select,textarea,summary{touch-action:manipulation}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,summary:focus-visible{
+ outline:2px solid var(--nova-accent);outline-offset:3px}
+.btn.primary:hover,.cbi-button-positive:hover,.cbi-button-apply:hover{background:var(--nova-accent-hover)!important}
+button:disabled,.cbi-button:disabled{cursor:not-allowed}
+.nova-refresh:focus-visible{outline:2px solid var(--nova-accent);outline-offset:3px}
+.nova-brand-mark{box-shadow:inset 0 1px 0 rgba(255,255,255,.06)}
+#topmenu>li.active>a{box-shadow:inset 3px 0 var(--nova-accent)}
+#topmenu .dropdown-menu a{line-height:1.6}
+#tabmenu .tabs>li>a,.cbi-tabmenu>li>a{color:var(--nova-muted)}
+#tabmenu .tabs>li.active>a,.cbi-tabmenu>li.cbi-tab>a{color:var(--nova-accent-hover)}
+.cbi-map{box-shadow:none}
+.cbi-section>h3{font-size:15px;font-weight:650}
+.cbi-value{border-color:var(--nova-border-soft)}
+.cbi-value-description{color:var(--nova-muted)}
+.table .tr.table-titles,.table .tr.cbi-section-table-titles{background:var(--nova-raised);color:var(--nova-muted)}
+.table .tr:hover{background-color:rgba(155,193,241,.04)}
+footer{font-size:11px;line-height:1.6}
 @media(max-width:1180px){.nova-search-wrap{width:180px}.nova-device{max-width:200px}}
 @media(max-width:900px){
  /* Horizontal navigation uses pop-out menus, not the desktop scroll container. */
- header{position:relative;width:100%;height:auto;min-height:0;padding:0 10px 10px;border-right:0;border-bottom:1px solid #292c34;
+ header{position:relative;width:100%;height:auto;min-height:0;padding:0 10px 10px;border-right:0;border-bottom:1px solid var(--nova-border-soft);
   box-sizing:border-box;overflow:visible}
  header .brand{width:calc(100% + 20px);margin:0 0 8px -10px}
  #topmenu{flex-direction:row;flex-wrap:wrap;gap:3px}
@@ -146,7 +176,7 @@ footer a{color:#a5c45f}
  #topmenu>li>a.menu::after{right:12px}
  #topmenu .dropdown-menu a{padding:7px 10px}
  #topmenu .dropdown-menu{position:absolute!important;top:100%;left:0;z-index:120;width:210px;
- background:#17191e;border:1px solid #2c3038;border-radius:8px;padding:5px}
+ background:var(--nova-surface);border:1px solid var(--nova-border);border-radius:8px;padding:5px}
  .nova-sidebar-foot{display:none}
  .nova-topbar{position:relative;inset:auto;height:auto;min-height:51px;padding:8px 12px}
  .nova-search-wrap{width:170px}
@@ -156,7 +186,7 @@ footer a{color:#a5c45f}
 @media(max-width:640px){
  .nova-topbar{align-items:flex-start;gap:6px;flex-direction:column}
  .nova-top-actions{width:100%;flex-wrap:wrap}
- .nova-search-wrap{flex:1;min-width:125px}
+ .nova-search-wrap{flex:1 1 160px;min-width:125px}
  .nova-device{max-width:45vw}
  #topmenu .dropdown-menu{left:0}
 }
