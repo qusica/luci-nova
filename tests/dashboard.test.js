@@ -284,6 +284,23 @@ for (const code of [401,403]) test('HTTP '+code+' blocks all fallback configurat
     app.responses['network.wireless.status']=new Error('RPC call failed with HTTP error '+code);await app.mount();
     assert.ok(!app.calls.some(c=>c[0]==='uci.get'));assert.match(text(app.root),new RegExp('权限不足（HTTP '+code+'）'));
 });
+for (const detail of ['error -32002', 'code -32002', 'Access denied', 'Permission denied']) test(detail+' blocks all fallback configuration reads',async()=>{
+    const app=harness();app.responses['network.interface.dump']=new Error('RPC call failed with '+detail);
+    app.responses['network.wireless.status']=new Error('RPC call failed with '+detail);await app.mount();
+    assert.ok(!app.calls.some(c=>c[0]==='uci.get'));
+});
+
+for (const [object, config] of [['network.interface.dump','network'],['network.wireless.status','wireless']]) {
+    for (const detail of ['HTTP error 401', 'HTTP error 403', 'ubus code 6', 'error -32002', 'code -32002']) test(object+' denies fallback at load and poll for '+detail,async()=>{
+        const app=harness();app.responses[object]=new Error(detail);await app.mount();await app.poll();
+        assert.ok(!app.calls.some(c=>c[0]==='uci.get'&&c[1]===config));
+    });
+    for (const detail of ['HTTP error 4010', 'code -320020']) test(object+' does not misclassify numeric boundary '+detail,async()=>{
+        const app=harness();app.responses[object]=new Error(detail);await app.mount();
+        assert.ok(app.calls.some(c=>c[0]==='uci.get'&&c[1]===config));
+    });
+}
+
 test('failed later runtime poll retains last-known inventory over configuration fallback',async()=>{
     const app=harness();await app.render([wanUp],{radio0:radio()});missingRuntime(app,{});await app.poll();
     assert.equal(count(app.root,'nv-internet'),1);assert.equal(count(app.root,'nv-wifi'),1);assert.match(text(app.root),/已保留上次检测结果/);

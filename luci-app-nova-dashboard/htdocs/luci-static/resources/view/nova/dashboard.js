@@ -82,7 +82,10 @@ function detectionError(error) {
 }
 function accessDenied(error) {
     var message = error && error.message || '';
-    return /ubus code 6(?:\D|$)|HTTP error (401|403)(?:\D|$)|(?:error|code) -32002(?:\D|$)|permission|access denied/i.test(message);
+    // The SDK jsmin misparses regex literals directly after return and can
+    // remove meaningful spaces. Assign the expression before returning it.
+    var denied = /ubus code 6(?:\D|$)|HTTP error (401|403)(?:\D|$)|(?:error|code) -32002(?:\D|$)|permission|access denied/i;
+    return denied.test(message);
 }
 function configuredInventory(value, type) {
     if (!object(value) || !object(value.values) || Object.keys(value.values).some(function(name) { return !object(value.values[name]); }))

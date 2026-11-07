@@ -7,8 +7,8 @@ const test = require('node:test');
 const source = fs.readFileSync(path.resolve(__dirname, '../luci-theme-nova/htdocs/luci-static/nova/nova-lists.js'), 'utf8');
 // Exercise the shipped filtering function with minimal row/control doubles.
 // The separate Chrome test covers actual DOM, native events, polling and layout.
-const start = source.indexOf('    function update(def, state) {');
-const end = source.indexOf('    function refresh()', start);
+const start = source.search(/function\s+update\s*\(def,\s*state\)\s*\{/);
+const end = source.search(/function\s+refresh\s*\(\)/);
 assert.ok(start > 0 && end > start, 'production filter function must be located');
 const update = new Function('pageSize', 'setText', 't', source.slice(start, end) + '; return update;')(
     25, (node, text) => { node.textContent = text; }, (en) => en);
@@ -33,8 +33,8 @@ function state(rows, query = '', family = 'all', page = 0, placeholders = []) {
 }
 function shown(rows) { return rows.filter(r => !r.classList.contains('nova-list-hidden')); }
 
-const emptyStart = source.indexOf('    function nativeEmptyLeaseMessage(heading) {');
-const emptyEnd = source.indexOf('    function enhanceEmptyLeases()', emptyStart);
+const emptyStart = source.search(/function\s+nativeEmptyLeaseMessage\s*\(heading\)\s*\{/);
+const emptyEnd = source.search(/function\s+enhanceEmptyLeases\s*\(\)/);
 assert.ok(emptyStart > 0 && emptyEnd > emptyStart, 'production empty-state matcher must be located');
 function emptyMatcher(translate) {
     return new Function('window', source.slice(emptyStart, emptyEnd) + '; return nativeEmptyLeaseMessage;')({ _: translate });
@@ -168,7 +168,7 @@ test('no matches show a separate empty state and literal HTML text is not parsed
 
 test('progressive enhancement does not add data access or replace native row content', () => {
     assert.doesNotMatch(source, /\b(fetch|XMLHttpRequest|localStorage|sessionStorage|innerHTML|outerHTML|cloneNode)\b/);
-    assert.match(source, /open: false/);
+    assert.match(source, /open:\s*false/);
     assert.match(source, /scroller\.appendChild\(table\)/);
     assert.match(source, /observer\.disconnect\(\)/);
     assert.match(source, /admin-status-overview/);
