@@ -2,7 +2,7 @@
 
 Nova is a dark LuCI theme and a companion status dashboard for OpenWrt and ImmortalWrt.
 
-> Preview 0.2.7: detected interface cards, live PPPoE status and searchable native LuCI lists. This is still experimental and has not been tested on every router or firmware. Keep Bootstrap installed for safe rollback.
+> Preview 0.2.8: detected interface cards, live PPPoE status and searchable native LuCI lists. This is still experimental and has not been tested on every router or firmware. Keep Bootstrap installed for safe rollback.
 
 ## Packages
 
@@ -131,6 +131,14 @@ rejects that mistake. To run the same comparison locally, set
 
 Project-authored files: MIT. Templates adapted from the LuCI Bootstrap theme retain their upstream Apache-2.0 notices.
 
+## What's new in 0.2.8
+
+- Preserve CSS bytes through packaging. The SDK's csstidy optimizer was observed
+  replacing muted-label declarations with an unrelated radio-meter background.
+- Verify every packaged stylesheet against source, plus exact small-label color,
+  transparency and size in the source and packaged visual browser suites.
+- JavaScript remains minified. APK compression still keeps the package compact.
+
 ## What's new in 0.2.7
 
 - Fix an actual native-LuCI rendering issue: dashboard SVG icons and charts now explicitly use the SVG namespace. LuCI's generic `E()` creates HTML elements even when the tag is `svg`, so that helper cannot create working vectors.
@@ -191,7 +199,7 @@ Detection uses strict `network.interface dump` and `network.wireless status` rea
 
 ### Updating an existing installation
 
-Make sure to download the fresh 0.2.7 packages from a **successful** CI run.
+Make sure to download the fresh 0.2.8 packages from a **successful** CI run.
 Install both packages again using your device's normal package-manager update/upgrade procedure,
 and reload the browser without cached assets. SSH rollback remains available above.
 

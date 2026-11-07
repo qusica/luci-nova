@@ -3,8 +3,12 @@ include $(TOPDIR)/rules.mk
 LUCI_TITLE:=Nova Status Dashboard
 LUCI_DEPENDS:=+luci-base
 PKG_LICENSE:=MIT
-PKG_VERSION:=0.2.7
+PKG_VERSION:=0.2.8
 PKG_RELEASE:=1
+
+# The SDK csstidy optimizer corrupts merged rules in our modern CSS. Keep
+# stylesheet bytes intact; APK compression still applies. JS remains minified.
+LUCI_MINIFY_CSS:=0
 
 # Bundle Nova's own native catalog so the normal two-package installation also
 # localizes the menu. Do not include other LuCI applications' translation keys.

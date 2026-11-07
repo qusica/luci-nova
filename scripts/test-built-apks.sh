@@ -19,6 +19,15 @@ cp -R "$base/tests" "$stage/tests"
 ln -s "$stage/extracted/www" "$stage/luci-app-nova-dashboard/htdocs"
 ln -s "$stage/extracted" "$stage/luci-app-nova-dashboard/root"
 ln -s "$stage/extracted/www" "$stage/luci-theme-nova/htdocs"
+# CSS is deliberately not run through SDK csstidy: its selector merging can
+# silently replace declarations. Verify every stylesheet, not just sampled UI.
+for package in luci-theme-nova luci-app-nova-dashboard; do
+    while IFS= read -r -d '' source; do
+        relative=${source#"$base/$package/htdocs/"}
+        cmp "$source" "$stage/extracted/www/$relative"
+        printf 'CSS payload matches source: %s\n' "$relative"
+    done < <(find "$base/$package/htdocs" -type f -name '*.css' -print0)
+done
 node --check "$stage/extracted/www/luci-static/resources/view/nova/dashboard.js"
 node --check "$stage/extracted/www/luci-static/nova/nova-shell.js"
 node --check "$stage/extracted/www/luci-static/nova/nova-lists.js"

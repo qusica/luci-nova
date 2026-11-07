@@ -32,3 +32,13 @@ nodes for those tags. The fixture was too permissive. Version 0.2.7 uses explici
 `document.createElementNS` for every icon/chart root and shape, with faithful
 HTML-only fixture `E()` implementations and actual rendered-geometry assertions.
 Package/cache versions advance because 0.2.6 had already been installed.
+
+## CSS packaging correction in 0.2.8
+
+Live 0.2.7 review caught a lavender rectangle behind muted topology help text.
+The source was correct, but SDK csstidy had merged four small-label selectors
+and replaced their color/font declarations with an unrelated radio-meter
+background. Both packages now use the supported `LUCI_MINIFY_CSS:=0` switch.
+APK compression still applies and JavaScript remains minified. Packaged tests
+compare every CSS file byte-for-byte with source and visual tests verify the
+affected labels' exact foreground, transparent background and 11 px size.
