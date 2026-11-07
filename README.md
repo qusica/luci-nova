@@ -98,7 +98,14 @@ Chrome or Chromium (the GitHub runner includes `google-chrome`):
 CHROME_BIN=google-chrome node --test tests/browser-layout.test.js
 CHROME_BIN=google-chrome node --test tests/navigation-browser.test.js
 CHROME_BIN=google-chrome node --test tests/native-lists-browser.test.js
+CHROME_BIN=google-chrome node --test tests/visual-browser.test.js
 ```
+
+When running all four browser files together, pass `--test-concurrency=1` to Node.
+Each suite launches its own Chrome process; serial startup avoids resource
+contention on small runners without weakening assertions or timeouts.
+CI and extracted-APK checks also create a writable, run-local Fontconfig cache
+and warm it before Chrome starts; cache failures remain test failures.
 
 The browser test uses local fixtures only. It starts with a stale stylesheet link,
 loads the current versioned CSS, and checks the actual Nova styles. It does not

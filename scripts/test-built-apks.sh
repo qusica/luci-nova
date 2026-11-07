@@ -23,4 +23,13 @@ node --check "$stage/extracted/www/luci-static/resources/view/nova/dashboard.js"
 node --check "$stage/extracted/www/luci-static/nova/nova-shell.js"
 node --check "$stage/extracted/www/luci-static/nova/nova-lists.js"
 node --test "$stage/tests/dashboard.test.js" "$stage/tests/native-lists.test.js" "$stage/tests/navigation.test.js" "$stage/tests/menu-localization.test.js"
-node --test "$stage/tests/browser-layout.test.js" "$stage/tests/native-lists-browser.test.js" "$stage/tests/navigation-browser.test.js" "$stage/tests/visual-browser.test.js"
+# Fontconfig may inherit non-writable system/user caches from the CI image.
+# Give this validation run its own cache and surface prewarm failures normally.
+export XDG_CACHE_HOME="$stage/browser-cache"
+mkdir -p "$XDG_CACHE_HOME/fontconfig"
+if command -v fc-cache >/dev/null 2>&1; then
+    fc-cache
+fi
+# Each file launches a separate Chrome process. Serialize startup on small CI
+# runners; preserve all suites, assertions and their bounded CDP timeouts.
+node --test --test-concurrency=1 "$stage/tests/browser-layout.test.js" "$stage/tests/native-lists-browser.test.js" "$stage/tests/navigation-browser.test.js" "$stage/tests/visual-browser.test.js"
