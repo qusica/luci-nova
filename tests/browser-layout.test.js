@@ -42,7 +42,8 @@ try {
             else if(typeof value==='boolean'){if(value)e.setAttribute(name,'');}
             else e.setAttribute(name,value);
         }
-        for(const child of Array.isArray(children)?children:[children])if(child!=null)e.append(child);
+        // Match LuCI 25.12 dom.append: null inside an array becomes text.
+        for(const child of Array.isArray(children)?children:[children])e.append(child);
         return e;
     }
     const lan={interface:'lan',up:true,device:'br-home'};
@@ -53,11 +54,16 @@ try {
     let interfaces=scenario==='lan'?[lan]:scenario==='pppoe'?[ppp]:scenario==='dual'?[{...ppp,up:true,l3_device:'pppoe-internet'},lan]:[];
     const wireless=scenario==='dual'?{radio0:wifi('2g',2462,11),radio1:wifi('5g',5180,36),radio2:wifi('6g',5955,1)}:
         scenario==='disabled'?{radio1:{up:false,disabled:true,config:{band:'5g'},interfaces:[]}}:{};
-    const polls=new Set();
+    const polls=new Set(),samples=[];
+    let runtimeFailed=scenario==='failed'||scenario==='configured';
     const app=new Function('view','rpc','poll','fs','E','L','document',${JSON.stringify(source)})(
-        {extend:x=>x},{declare:options=>()=>{
+        {extend:x=>x},{declare:options=>(...args)=>{
             const key=options.object+'.'+options.method;
-            if(scenario==='failed'&&(key==='network.interface.dump'||key==='network.wireless.status'))return Promise.reject(new Error('Detection failed'));
+            if(runtimeFailed&&(key==='network.interface.dump'||key==='network.wireless.status'))return Promise.reject(new Error('RPC call failed with ubus code 4: 未找到'));
+            if(key==='uci.get')return Promise.resolve(scenario==='configured'?{values:args[0]==='network'?{
+                lan:{'.type':'interface',device:'br-home',proto:'static'},internet:{'.type':'interface',device:'eth1',proto:'pppoe',password:'private-never-render'}
+            }:{radio0:{'.type':'wifi-device',band:'5g',disabled:'1'}}}:{});
+            if(key==='luci.getRealtimeStats')samples.push(args);
             return Promise.resolve(key==='system.board'?{hostname:'local-fixture',release:{description:'OpenWrt fixture'}}:
                 key==='network.interface.dump'?{interface:interfaces}:key==='network.wireless.status'||key==='luci-rpc.getWirelessDevices'?structuredClone(wireless):
                 key==='iwinfo.assoclist'?{results:[]}:key==='luci.getRealtimeStats'?[[1,100,0,50],[4,400,0,200]]:{});
@@ -65,7 +71,7 @@ try {
         {url:x=>'/cgi-bin/luci/'+x,resource:x=>${JSON.stringify(dashboardUrl)}},document);
     const data=await app.load();
     const stylesheet=document.getElementById('nova-dashboard-style');
-    const expectedHref=${JSON.stringify(dashboardUrl)}+'?v=0.2.3';
+    const expectedHref=${JSON.stringify(dashboardUrl)}+'?v=0.2.4';
     const styleLoaded=new Promise((resolve,reject)=>{
         function loaded(){
             if(stylesheet.getAttribute('href')===expectedHref && stylesheet.sheet && stylesheet.sheet.href===expectedHref){
@@ -78,9 +84,10 @@ try {
     document.getElementById('maincontent').append(app.render(data));
     await styleLoaded;
     function check(condition,message){if(!condition)throw new Error(message);}
-    check(stylesheet.getAttribute('href')===${JSON.stringify(dashboardUrl)}+'?v=0.2.3','stale CSS link was not upgraded');
+    check(stylesheet.getAttribute('href')===${JSON.stringify(dashboardUrl)}+'?v=0.2.4','stale CSS link was not upgraded');
+    check(!/null|undefined/.test(document.querySelector('.nova-dashboard').textContent),'conditional DOM entries leaked literal null/undefined');
     const width=window.innerWidth;
-    const expected=scenario==='dual'?6:scenario==='disabled'?5:scenario==='pppoe'?4:3;
+    const expected=scenario==='dual'||scenario==='configured'?6:scenario==='disabled'?5:scenario==='pppoe'?4:3;
     const grid=getComputedStyle(document.querySelector('.nv-metric-grid'));
     check(grid.display==='grid','dashboard metric layout is not grid');
     const columns=grid.gridTemplateColumns.split(' ').filter(v=>parseFloat(v)>0).length;
@@ -94,7 +101,14 @@ try {
         check(document.querySelector('.nv-wifi').textContent.includes('已禁用'),'disabled radio status missing');
         check(!document.querySelector('.nv-internet,.nv-traffic'),'disabled-only fixture adds a WAN');
     }
-    if(scenario==='failed')check(document.querySelector('.nv-detection-warning'),'detection error is hidden');
+    if(scenario==='failed'||scenario==='configured')check(document.querySelector('.nv-detection-warning'),'detection error is hidden');
+    if(scenario==='configured'){
+        check(document.querySelectorAll('.nv-wifi').length===1,'configured radio lost');
+        check(document.querySelector('.nv-wifi').textContent.includes('已禁用（配置）'),'configured disabled state lost');
+        check(document.querySelector('.nv-internet').textContent.includes('状态未知'),'configured PPPoE claims runtime state');
+        check(!document.querySelector('.nova-dashboard').textContent.includes('private-never-render'),'configuration secret rendered');
+        await [...polls][0]();check(samples.length===0,'unavailable runtime sampled traffic');
+    }
     const branches=document.querySelectorAll('.nv-radio');
     const clients=document.querySelectorAll('.nv-client');
     check(branches.length===clients.length,'branch/client rows differ');
@@ -104,7 +118,7 @@ try {
     if(scenario==='empty')check(topology.scrollWidth<=topology.clientWidth+1,'empty topology leaves phantom columns');
     check(getComputedStyle(document.querySelector('.nv-overview-head')).display==='flex','dashboard header is not flex');
     const router=document.querySelector('.nv-router');
-    check(router.title==='OpenWrt fixture · '+(scenario==='lan'||scenario==='dual'?'LAN br-home':scenario==='failed'?'接口检测失败':'未检测到 LAN 接口'),'LAN tooltip');
+    check(router.title==='OpenWrt fixture · '+(scenario==='configured'?'LAN br-home（已配置，运行状态未知）':scenario==='lan'||scenario==='dual'?'LAN br-home':scenario==='failed'?'接口检测失败':'未检测到 LAN 接口'),'LAN tooltip');
     router.click();router.click();
     check(document.querySelectorAll('#nv-selected a').length===1,'repeated node clicks duplicated detail');
     const header=document.querySelector('header');
@@ -118,6 +132,13 @@ try {
         check(hit&&menu.contains(hit),'status submenu is not visible/hittable beyond the header');
     }else{
         check(getComputedStyle(header).overflowY==='auto','desktop sidebar must remain scrollable');
+    }
+    if(scenario==='configured'){
+        runtimeFailed=false;interfaces=[{...ppp,up:true,l3_device:'pppoe-internet','ipv4-address':[{address:'203.0.113.8'}]},lan];
+        await [...polls][0]();
+        check(!document.querySelector('.nv-detection-warning'),'runtime recovery kept stale warnings');
+        check(!document.querySelector('.nv-wifi'),'runtime recovery kept removed configured radio');
+        check(document.querySelector('.nv-internet').textContent.includes('203.0.113.8'),'runtime recovery did not update configured PPPoE');
     }
     if(scenario==='pppoe'){
         router.focus();
@@ -139,7 +160,7 @@ try {
         fs.writeFileSync(path.join(temporary, 'frame.html'), child);
         const frame = pathToFileURL(path.join(temporary, 'frame.html')).href;
         const widths = [1600, 1180, 700, 528, 390];
-        const scenarios = ['empty','lan','pppoe','dual','disabled','failed'];
+        const scenarios = ['empty','lan','pppoe','dual','disabled','failed','configured'];
         fs.writeFileSync(path.join(temporary, 'index.html'), `<!doctype html><meta charset="utf-8"><pre id="results">pending</pre><script>
 const results=[];
 addEventListener('message',event=>{if(!event.data||typeof event.data.passed!=='boolean')return;results.push(event.data);

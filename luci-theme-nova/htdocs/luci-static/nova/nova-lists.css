@@ -18,7 +18,7 @@
 .nova-list-range{font-variant-numeric:tabular-nums;color:#b8bec9}
 .nova-list-empty{padding:12px;color:#b8bec9}
 .nova-list-tools button:focus-visible,.nova-list-summary:focus-visible,.nova-list-scroll:focus-visible,.nova-list-pager button:focus-visible{outline:2px solid #c5ef4d;outline-offset:2px}
-.nova-list-pager[hidden],.nova-list-empty[hidden]{display:none!important}
+.nova-list-tools[hidden],.nova-list-pager[hidden],.nova-list-empty[hidden]{display:none!important}
 /* Keep columns on phones inside a horizontal scroller, rather than dropping data. */
 .nova-list-scroll .hide-xs{display:revert!important}
 @media(max-width:600px){.nova-list-summary{padding:11px 8px}.nova-list-tools{gap:8px}.nova-list-note{flex-basis:100%}.nova-list-body{padding:7px}.nova-list-search{max-width:none}.nova-list-scroll>.table{font-size:12px}}

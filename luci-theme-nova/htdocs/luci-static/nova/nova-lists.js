@@ -23,6 +23,7 @@
       { id: 'wifi_assoclist_table', family: '', owner: 'stations', name: t('Associated stations', '无线已关联站点') }
     ] : [{ id: 'connections', family: '', owner: 'connections', name: t('Connections', '连接'), group: true }];
     var states = {}, owners = {}, focused = null, timer = null;
+    var emptyLeases = { open: false, details: null };
     var pageSize = 25;
 
     function observe() { observer.observe(root, { childList: true, subtree: true, characterData: true }); }
@@ -39,7 +40,7 @@
     function toolbar(def, table) {
       var owner = owners[def.owner];
       if (!owner) owner = owners[def.owner] = { query: '', family: 'all' };
-      if (owner.tools && owner.tools.isConnected) return owner;
+      if (owner.tools && owner.tools.isConnected) { owner.tools.hidden = false; return owner; }
       var section = table.closest('.cbi-section');
       var title = section && section.querySelector(':scope > .cbi-title');
       // In overview the title is not replaced by LuCI's polling cycle.
@@ -90,6 +91,49 @@
     }
     function resetPages(owner) {
       definitions.forEach(function(def) { if (def.owner === owner && states[def.id]) states[def.id].page = 0; });
+    }
+    function nativeEmptyLeaseMessage(heading) {
+      if (typeof window._ !== 'function') return null;
+      var control = heading.querySelector(':scope > [data-indicator="poll-status"][data-clickable="true"]');
+      if (!control) return null;
+      var title = Array.prototype.filter.call(heading.childNodes, function(child) { return child !== control; })
+        .map(function(child) { return child.textContent; }).join('').trim();
+      var content = heading.parentElement.nextElementSibling;
+      var message = content && content.firstElementChild;
+      if (title !== window._('DHCP Leases') || !content || content.tagName !== 'DIV' || content.children.length !== 1 ||
+          !message || message.tagName !== 'EM' || message.textContent !== window._('No active leases found') || message.classList.contains('spinning')) return null;
+      return { title: title, content: content, message: message };
+    }
+    function enhanceEmptyLeases() {
+      // Native 40_dhcp.js emits only one translated <em> when BOTH families
+      // are empty, so there are no table IDs to discover on an empty first load.
+      // Match the native controller structure and its own translated strings.
+      // Unknown/add-on sections and loading/error messages remain untouched.
+      root.querySelectorAll('.cbi-section > .cbi-title > h3').forEach(function(heading) {
+        var native = nativeEmptyLeaseMessage(heading);
+        if (!native) return;
+        var content = native.content, message = native.message;
+        if (owners.leases && owners.leases.tools) owners.leases.tools.hidden = true;
+        if (emptyLeases.details) emptyLeases.open = emptyLeases.details.open;
+        var details = element('details', 'nova-list-group nova-list-empty-group');
+        var summary = element('summary', 'nova-list-summary');
+        summary.append(element('span', 'nova-list-title', native.title), element('span', 'nova-list-count', '0'));
+        var body = element('div', 'nova-list-body');
+        body.id = 'nova-list-empty-leases';
+        content.insertBefore(details, message);
+        body.appendChild(message); // Preserve the actual native empty message, not invented rows.
+        details.append(summary, body);
+        details.open = emptyLeases.open;
+        summary.setAttribute('aria-controls', body.id);
+        summary.setAttribute('aria-expanded', String(details.open));
+        details.addEventListener('toggle', function() {
+          if (emptyLeases.details !== details) return;
+          emptyLeases.open = details.open;
+          summary.setAttribute('aria-expanded', String(details.open));
+        });
+        focusKey(summary, 'leases-empty-summary');
+        emptyLeases.details = details;
+      });
     }
     function enhance(def, table) {
       var state = states[def.id];
@@ -185,6 +229,7 @@
           var table = root.querySelector('#' + def.id);
           if (table) update(def, enhance(def, table));
         });
+        if (overview && !root.querySelector('#status_leases, #status_leases6')) enhanceEmptyLeases();
         if (focused && !focused.node.isConnected && document.activeElement === document.body) {
           var replacement = root.querySelector('[data-nova-list-focus="' + focused.key + '"]');
           if (replacement) replacement.focus({ preventScroll: true });

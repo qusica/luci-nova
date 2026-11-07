@@ -10,22 +10,26 @@ const { pathToFileURL } = require('node:url');
 const chromium = require('./helpers/chromium');
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-function fixture(directory, page = 'admin-status-overview') {
+function fixture(directory, page = 'admin-status-overview', initialLeases = 81, language = 'zh-cn') {
     const assets = path.resolve(__dirname, '../luci-theme-nova/htdocs/luci-static/nova');
     for (const name of ['cascade.css', 'nova-lists.css', 'nova-lists.js']) fs.copyFileSync(path.join(assets, name), path.join(directory, name));
-    const file = path.join(directory, page + '.html');
-    fs.writeFileSync(file, `<!doctype html><html lang="zh-cn"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+    const file = path.join(directory, page + '-' + initialLeases + '-' + language + '.html');
+    const translations = language === 'zh-cn' ? { 'DHCP Leases': 'DHCP 租约', 'No active leases found': '没有已分配的租约' } :
+        language === 'fr' ? { 'DHCP Leases': 'Baux DHCP', 'No active leases found': 'Aucun bail actif' } : {};
+    fs.writeFileSync(file, `<!doctype html><html lang="${language}"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <style>body{margin:0}table{border-collapse:collapse}td,th{padding:7px;text-align:left}th{white-space:nowrap}.table{display:table}.tr{display:table-row}.td,.th{display:table-cell}button{cursor:pointer}#maincontent{margin:0!important;padding:20px!important}.hide-xs{display:none}</style>
 <link rel="stylesheet" href="cascade.css"><link rel="stylesheet" href="nova-lists.css"><script defer src="nova-lists.js"></script>
 <body data-page="${page}"><main id="maincontent" class="container"><div id="view">
 <section class="cbi-section" id="system"><div class="cbi-title"><h3>系统 <span>Hide</span></h3></div><div id="system-data">OpenWrt model · kernel · uptime · load</div></section>
 <section class="cbi-section" id="storage"><div class="cbi-title"><h3>存储 <span>Hide</span></h3></div><div id="storage-data"><progress value="17" max="100"></progress><a href="#mount">/overlay · /tmp · /mnt/data</a></div></section>
-<section class="cbi-section" id="dhcp"><div class="cbi-title"><h3>DHCP 租约 <span id="native-hide">Hide</span></h3></div><div id="leases-content"></div></section>
+<section class="cbi-section" id="dhcp"><div class="cbi-title"><h3>DHCP Leases <span id="native-hide" data-indicator="poll-status" data-clickable="true">Hide</span></h3></div><div id="leases-content"></div></section>
 <section class="cbi-section" id="wifi"><div class="cbi-title"><h3>无线 <span>Hide</span></h3></div><div id="wifi-content"></div></section>
 <section class="cbi-section" id="extra"><h3>Third-party plugin</h3><button id="plugin-action">Native extra action</button></section>
 <section class="cbi-section" id="connection-section"><input id="filter-connections" placeholder="Native filter"><button id="lookup">Enable DNS lookups</button><div id="connection-content"></div></section>
 </div></main><script>
 window.actionCount=0; window.requests=0; window.initialStorage=document.getElementById('storage-data');
+window._=text=>(${JSON.stringify(translations)})[text] || text;
+document.querySelector('#dhcp > .cbi-title > h3').firstChild.textContent=_('DHCP Leases')+' ';
 window.fetch=()=>{window.requests++;throw new Error('Unexpected network request')};
 function cell(tag,text){const e=document.createElement(tag);e.className=tag==='th'?'th':'td';e.textContent=text;return e;}
 window.makeTable=(id,count,readonly=false)=>{
@@ -46,7 +50,7 @@ window.makeTable=(id,count,readonly=false)=>{
 };
 window.pollLeases=(count=81,readonly=false)=>{
  const host=document.getElementById('leases-content');host.replaceChildren();
- if(count<0){host.textContent='No active leases found';return;}
+ if(count<0){const message=document.createElement('em');message.textContent=_('No active leases found');host.append(message);window.nativeEmptyMessage=message;return;}
  for(const [id,title,n] of [['status_leases','Active DHCPv4 Leases',count],['status_leases6','Active DHCPv6 Leases',Math.min(count,3)]]){
   const h=document.createElement('h3');h.textContent=title;host.append(h,makeTable(id,n,readonly));
  }
@@ -55,7 +59,7 @@ window.pollWifi=()=>{const host=document.getElementById('wifi-content');host.rep
 document.getElementById('native-hide').onclick=()=>{const box=document.getElementById('leases-content');if(box.style.display==='none'){box.style.display='';box.textContent='Collecting data...';setTimeout(()=>pollLeases(81),20);}else box.style.display='none';};
 addEventListener('load',()=>setTimeout(()=>{
  if(${JSON.stringify(page)}.includes('connections'))document.getElementById('connection-content').append(makeTable('connections',99));
- else{pollLeases();pollWifi();}
+ else{pollLeases(${initialLeases});pollWifi();}
  window.fixtureReady=true;
 },20));
 </script></body></html>`);
@@ -123,6 +127,34 @@ test('native lists preserve modules/actions, grouping, focus, polling and bounde
                 table.querySelectorAll('tr[data-index]').length===${count};
         })()`);
         const visible = id => evaluate(`document.querySelectorAll('#${id} tr:not(.table-titles):not(.placeholder):not(.nova-list-hidden)').length`);
+        // Actual upstream empty branch has a translated EM, no tables or family IDs.
+        for (const language of ['zh-cn', 'en', 'fr']) {
+            await send('Page.navigate', { url: fixture(directory, 'admin-status-overview', -1, language) });
+            await until('window.fixtureReady && document.querySelectorAll(".nova-list-empty-group").length === 1');
+            assert.equal(await evaluate('document.querySelector(".nova-list-empty-group").open'), false);
+            assert.equal(await evaluate('document.querySelector(".nova-list-empty-group .nova-list-body em") === window.nativeEmptyMessage'), true);
+            assert.equal(await evaluate('document.getElementById("nova-search-leases") === null'), true);
+            assert.equal(await evaluate('document.getElementById("status_leases") === null && document.getElementById("status_leases6") === null'), true);
+            assert.equal(await evaluate('document.getElementById("storage-data") === window.initialStorage && !!document.getElementById("native-hide")'), true);
+            await evaluate('document.querySelector(".nova-list-empty-group").open=true;pollLeases(-1)');
+            await until('document.querySelector(".nova-list-empty-group").open === true');
+            await evaluate('pollLeases(4)'); await leasesReady(4);
+            assert.equal(await evaluate('document.querySelectorAll(".nova-list-empty-group").length'), 0);
+            await input('host-2'); assert.equal(await visible('status_leases'), 1);
+            await evaluate('window.originalLeaseSearch=document.getElementById("nova-search-leases");pollLeases(-1)');
+            await until('document.querySelectorAll(".nova-list-empty-group").length === 1 && !document.getElementById("status_leases")');
+            assert.equal(await evaluate('document.getElementById("nova-search-leases").closest(".nova-list-tools").hidden'), true);
+            await evaluate('pollLeases(4)'); await leasesReady(4);
+            assert.equal(await evaluate('document.getElementById("nova-search-leases") === window.originalLeaseSearch'), true);
+            assert.equal(await evaluate('document.getElementById("nova-search-leases").value'), 'host-2');
+            assert.equal(await evaluate('document.getElementById("nova-search-leases").closest(".nova-list-tools").hidden'), false);
+            assert.equal(await visible('status_leases'), 1);
+            assert.equal(await evaluate('document.querySelectorAll("#nova-search-leases").length'), 1);
+            await evaluate('const loading=document.createElement("em");loading.className="spinning";loading.textContent="Collecting data...";document.getElementById("leases-content").replaceChildren(loading)');
+            await until('document.querySelector("#leases-content > em.spinning") !== null');
+            assert.equal(await evaluate('document.querySelectorAll("#leases-content .nova-list-group").length'), 0);
+            assert.equal(await evaluate('window.requests'), 0);
+        }
         await send('Page.navigate', { url });
         await until('document.querySelectorAll(".nova-list-group").length === 3');
         assert.equal(await evaluate('document.querySelectorAll(".nova-list-group[open]").length'), 0);
@@ -183,8 +215,8 @@ test('native lists preserve modules/actions, grouping, focus, polling and bounde
         await input('');
         // Empty/no-permission transitions do not fabricate clients or discard state.
         await evaluate('pollLeases(-1)');
-        await until('document.querySelectorAll("#leases-content .nova-list-group").length === 0 && !document.getElementById("status_leases")');
-        assert.equal(await evaluate('document.querySelectorAll("#leases-content .nova-list-group").length'), 0);
+        await until('document.querySelectorAll("#leases-content .nova-list-empty-group").length === 1 && !document.getElementById("status_leases")');
+        assert.equal(await evaluate('document.querySelector("#leases-content .nova-list-body em") === window.nativeEmptyMessage'), true);
         await evaluate('pollLeases(0)');
         await leasesReady(0);
         await until('document.querySelector("#status_leases .placeholder") !== null');

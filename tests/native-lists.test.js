@@ -33,6 +33,61 @@ function state(rows, query = '', family = 'all', page = 0, placeholders = []) {
 }
 function shown(rows) { return rows.filter(r => !r.classList.contains('nova-list-hidden')); }
 
+const emptyStart = source.indexOf('    function nativeEmptyLeaseMessage(heading) {');
+const emptyEnd = source.indexOf('    function enhanceEmptyLeases()', emptyStart);
+assert.ok(emptyStart > 0 && emptyEnd > emptyStart, 'production empty-state matcher must be located');
+function emptyMatcher(translate) {
+    return new Function('window', source.slice(emptyStart, emptyEnd) + '; return nativeEmptyLeaseMessage;')({ _: translate });
+}
+function emptyHeading(title, messageText) {
+    const message = { tagName: 'EM', textContent: messageText, classList: { contains: () => false } };
+    const content = { tagName: 'DIV', children: [message], firstElementChild: message };
+    const control = { textContent: 'Hide' };
+    const heading = {
+        childNodes: [{ textContent: title + ' ' }, control],
+        querySelector: () => control,
+        parentElement: { nextElementSibling: content }
+    };
+    return { heading, control, content, message };
+}
+
+test('first-load DHCP empty branch matches LuCI translations and preserves its actual message', () => {
+    for (const [title, text] of [['DHCP Leases', 'No active leases found'], ['DHCP 租约', '没有已分配的租约'], ['Baux DHCP', 'Aucun bail actif']]) {
+        const translate = key => key === 'DHCP Leases' ? title : text;
+        const fixture = emptyHeading(title, text);
+        const result = emptyMatcher(translate)(fixture.heading);
+        assert.equal(result.title, title);
+        assert.equal(result.content, fixture.content);
+        assert.equal(result.message, fixture.message);
+        assert.equal(fixture.heading.childNodes[1], fixture.control);
+    }
+});
+
+test('missing LuCI translation/runtime or native poll control cannot identify an empty module', () => {
+    const fixture = emptyHeading('DHCP Leases', 'No active leases found');
+    assert.equal(emptyMatcher(undefined)(fixture.heading), null);
+    fixture.heading.querySelector = () => null;
+    assert.equal(emptyMatcher(key => key)(fixture.heading), null);
+});
+
+test('empty-state matcher leaves add-ons, pending loads and failures unchanged', () => {
+    const match = emptyMatcher(key => key);
+    for (const change of [
+        fixture => { fixture.heading.childNodes[0].textContent = 'Unrelated plugin '; },
+        fixture => { fixture.message.textContent = 'Collecting data...'; },
+        fixture => { fixture.message.textContent = 'Permission denied'; },
+        fixture => { fixture.message.classList.contains = value => value === 'spinning'; },
+        fixture => { fixture.message.tagName = 'P'; },
+        fixture => { fixture.content.children.push({}); },
+        fixture => { fixture.content.tagName = 'SECTION'; },
+        fixture => { fixture.heading.parentElement.nextElementSibling = null; }
+    ]) {
+        const fixture = emptyHeading('DHCP Leases', 'No active leases found');
+        change(fixture);
+        assert.equal(match(fixture.heading), null);
+    }
+});
+
 test('native rows are preserved and paginated without truncating payloads', () => {
     const rows = Array.from({ length: 5000 }, (_, i) => row('host-' + i));
     const value = state(rows);

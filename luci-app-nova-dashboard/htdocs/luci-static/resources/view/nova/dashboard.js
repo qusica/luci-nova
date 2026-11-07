@@ -5,7 +5,7 @@
 'require fs';
 
 // Keep in sync with PKG_VERSION; tests enforce this cache key on every release.
-var dashboardAssetVersion = '0.2.3';
+var dashboardAssetVersion = '0.2.4';
 
 var getBoard = rpc.declare({ object: 'system', method: 'board' });
 var getInfo = rpc.declare({ object: 'system', method: 'info' });
@@ -13,6 +13,7 @@ var getInfo = rpc.declare({ object: 'system', method: 'info' });
 // resolves ubus error codes (and expect:{} can silently mask them).
 var getInterfaces = rpc.declare({ object: 'network.interface', method: 'dump', reject: true });
 var getWirelessStatus = rpc.declare({ object: 'network.wireless', method: 'status', reject: true });
+var getConfig = rpc.declare({ object: 'uci', method: 'get', params: [ 'config', 'type' ], reject: true });
 var getWireless = rpc.declare({ object: 'luci-rpc', method: 'getWirelessDevices', reject: true });
 var getAssocs = rpc.declare({ object: 'iwinfo', method: 'assoclist', params: [ 'device' ], reject: true });
 var getRealtime = rpc.declare({
@@ -54,16 +55,61 @@ function wifiNetworks(radios) {
                 getNoise: function() { return iw.noise != null ? iw.noise : null; },
                 getBand: function() { return rc.band || (rc.hwmode === '11a' ? '5g' : rc.hwmode === '11g' ? '2g' : ''); },
                 isDisabled: function() { return radio.disabled === true || rc.disabled === true || rc.disabled === '1' || config.disabled === true || config.disabled === '1'; },
+                isKnown: function() { return !radio.configuredOnly; },
                 isUp: function() { return radio.up === true && !!vif.ifname; }
             });
         });
     });
     return nets;
 }
+function detectionError(error) {
+    // Show bounded diagnostics, never RPC payloads, URLs or credentials.
+    // LuCI translates descriptions, so use numeric ubus codes first.
+    var message = error && error.message || '', reason = '请求失败';
+    var code = message.match(/ubus code (\d{1,3})(?:\D|$)/);
+    var labels = {1:'方法不可用',3:'方法不可用',4:'对象不存在',5:'无数据',6:'权限不足',7:'请求超时',8:'方法不可用',10:'连接失败'};
+    if (code) return (labels[code[1]] || reason)+'（ubus '+code[1]+'）';
+    code = message.match(/HTTP error (\d{3})(?:\D|$)/i);
+    if (code) return (code[1]==='401'||code[1]==='403'?'权限不足':'HTTP 请求失败')+'（HTTP '+code[1]+'）';
+    if (/Invalid (interface|wireless|configuration) inventory/.test(message)) reason = '返回格式异常';
+    else if (/permission|access denied/i.test(message)) reason = '权限不足';
+    else if (/method not found|not supported|invalid command/i.test(message)) reason = '方法不可用';
+    else if (/not found|no data/i.test(message)) reason = '对象不存在或无数据';
+    else if (/timeout|timed out/i.test(message)) reason = '请求超时';
+    else if (/failed to fetch|NetworkError|network request|connection failed|connection refused|network unreachable/i.test(message)) reason = '连接失败';
+    code = message.match(/(?:error|code)\s+(-?\d{1,7})(?:\D|$)/i);
+    return reason + (code ? '（RPC '+code[1]+'）' : '');
+}
+function accessDenied(error) {
+    var message = error && error.message || '';
+    return /ubus code 6(?:\D|$)|HTTP error (401|403)(?:\D|$)|(?:error|code) -32002(?:\D|$)|permission|access denied/i.test(message);
+}
+function configuredInventory(value, type) {
+    if (!object(value) || !object(value.values) || Object.keys(value.values).some(function(name) { return !object(value.values[name]); }))
+        throw new Error('Invalid configuration inventory');
+    // Copy only display fields; never keep PPP credentials or wireless keys.
+    var interfaces = [], radios = {};
+    Object.keys(value.values).forEach(function(name) {
+        var section = value.values[name];
+        if (section['.type'] !== type) return;
+        function text(key) { return typeof section[key] === 'string' ? section[key] : ''; }
+        if (type === 'interface') interfaces.push({interface:name,proto:text('proto'),device:text('device') || text('ifname'),configuredOnly:true});
+        else radios[name] = {config:{band:text('band'),hwmode:text('hwmode'),disabled:text('disabled')},interfaces:[],configuredOnly:true};
+    });
+    return type === 'interface' ? {interface:interfaces} : radios;
+}
 function readDetection() {
+    var errors = {}, denied = {};
+    function inventory(task, name) {
+        return Promise.resolve(task).catch(function(error) {
+            errors[name] = detectionError(error);
+            denied[name] = accessDenied(error);
+            return null;
+        });
+    }
     return Promise.all([
-        safe(getInterfaces().then(interfaceDump), null),
-        safe(Promise.all([getWirelessStatus().then(wirelessDump),safe(getWireless(),null)]).then(function(results){
+        inventory(getInterfaces().then(interfaceDump), 'interfaces'),
+        inventory(Promise.all([getWirelessStatus().then(wirelessDump),safe(getWireless(),null)]).then(function(results){
             var status=results[0], enriched=results[1];
             // luci-rpc masks an underlying netifd timeout as {}, so only the
             // direct network.wireless status may establish presence/absence.
@@ -77,11 +123,20 @@ function readDetection() {
                 });
             });
             return status;
-        }), null)
-    ]);
+        }), 'wireless')
+    ]).then(function(results) {
+        // Runtime failure is not absence. Read already-authorized configuration
+        // only as a labelled fallback, never as proof of current hardware/state.
+        // Do not try an alternate source after an explicit runtime access denial.
+        return Promise.all([
+            results[0]===null && !denied.interfaces ? inventory(getConfig('network','interface').then(function(value){return configuredInventory(value,'interface');}), 'interfaceConfig') : null,
+            results[1]===null && !denied.wireless ? inventory(getConfig('wireless','wifi-device').then(function(value){return configuredInventory(value,'wifi-device');}), 'wirelessConfig') : null
+        ]).then(function(configs) { return results.concat([errors], configs); });
+    });
 }
 function readStations(nets) {
     return Promise.all(nets.map(function(n) {
+        if (n.isKnown && !n.isKnown()) return null;
         if (!n.isUp() || n.isDisabled() || !n.getIfname()) return [];
         return safe(Promise.all(n.getAssocDevices().map(function(device){
             return getAssocs(device).then(function(value) {
@@ -109,7 +164,11 @@ function attrValue(node, val) { if (node) node.textContent = val; }
 function dot(){ return E('span', {'class':'nv-dot', 'aria-hidden':'true'}); }
 function label(text) {return E('span', {'class':'nv-kicker'}, text);}
 function tag(text, kind) {return E('span', {'class':'nv-tag '+(kind || '')}, text);}
-function el(kind, klass, contents){return E(kind, {'class':klass}, contents);}
+function children(contents) {
+    // LuCI 25.12 stringifies null array entries rather than ignoring them.
+    return Array.isArray(contents) ? contents.filter(function(child) { return child != null; }) : contents;
+}
+function el(kind, klass, contents){return E(kind, {'class':klass}, children(contents));}
 function metric(name,value,detail,key){
     return el('div','nv-metric',[
         el('span','nv-metric-icon', '✓'),
@@ -152,7 +211,9 @@ function bucket(net){
 }
 function bandName(band) { return band === 'other' ? '无线（频段未知）' : band+' GHz'; }
 function wifiState(g) {
-    if(g.every(function(n){return n.net.isDisabled && n.net.isDisabled();})) return '已禁用';
+    var unknown=g.some(function(n){return n.net.isKnown && !n.net.isKnown();});
+    if(g.every(function(n){return n.net.isDisabled && n.net.isDisabled();})) return unknown ? '已禁用（配置）' : '已禁用';
+    if(unknown) return '状态未知';
     return g.some(function(n){return n.net.isUp && n.net.isUp();}) ? '已启用' : '未连接';
 }
 function bands(networks,assocLists){
@@ -202,7 +263,7 @@ function wifiCard(band,g){
                 E('line',{'x1':'0','y1':'65','x2':'360','y2':'65','class':'nv-axis'}),
                 E('polyline',{'data-nova':'wifi-'+id,'class':'nv-spark','points':'0,65 360,65'})
             ]),
-            E('span',{'data-nova':'wifi-rate-'+id,'class':'nv-mini-rate'},net && net.isUp && net.isUp() ? '等待采样' : '接口未连接')
+            E('span',{'data-nova':'wifi-rate-'+id,'class':'nv-mini-rate'},net && net.isKnown && !net.isKnown() ? '运行状态未知' : net && net.isUp && net.isUp() ? '等待采样' : '接口未连接')
         ])
     ]);
 }
@@ -268,10 +329,10 @@ return view.extend({
             safe(getBoard(),{}), safe(getInfo(),{}), readDetection(),
             safe(fs.read('/proc/stat'),null), safe(fs.read('/sys/class/thermal/thermal_zone0/temp'),null)
         ]).then(function(d){
-            var nets=wifiNetworks(d[2][1]);
+            var nets=wifiNetworks(d[2][1] || d[2][4]);
             return readStations(nets).then(function(stations){
-                return [d[0],d[1],d[2][0],nets,{},d[3],d[4],stations,
-                    {interfaces:d[2][0]!==null,wireless:d[2][1]!==null},d[2][1]];
+                return [d[0],d[1],d[2][0] || d[2][3],nets,{},d[3],d[4],stations,
+                    {interfaces:d[2][0]!==null,wireless:d[2][1]!==null,errors:d[2][2],interfacesConfigured:d[2][0]===null && d[2][3]!==null,wirelessConfigured:d[2][1]===null && d[2][4]!==null},d[2][1] || d[2][4]];
             });
         });
     },
@@ -290,7 +351,8 @@ return view.extend({
         var lan=entries.find(function(n){return n.interface==='lan';}) || {};
         var hasLan=!!lan.interface;
         var lanDev=lan.l3_device || lan.device;
-        var lanSummary=lanDev ? 'LAN '+lanDev : hasLan ? 'LAN '+lan.interface+' · 未连接' : detected.interfaces ? '未检测到 LAN 接口' : '接口检测失败';
+        var lanSummary=lanDev ? 'LAN '+lanDev : hasLan ? 'LAN '+lan.interface+' · '+(detected.interfaces?'未连接':'状态未知') : detected.interfaces ? '未检测到 LAN 接口' : '接口检测失败';
+        if(hasLan && detected.interfacesConfigured)lanSummary+='（已配置，运行状态未知）';
         var mem=sys.memory||{},root=sys.root||{};
         var memUsed=number(mem.total)-number(mem.available!=null?mem.available:mem.free);
         var memPct=percent(memUsed,mem.total);
@@ -304,9 +366,12 @@ return view.extend({
         var visibleBands=shownBands.filter(function(band){return band!=='other';}).length;
         var clientsKnown=detected.wireless && wifiAll.every(function(n){return n.known;});
         var warnings=[];
-        if(!detected.interfaces) warnings.push('接口检测失败，无法确认 WAN/LAN 是否存在');
-        if(!detected.wireless) warnings.push('无线检测失败，无法确认无线接口是否存在');
-        if(warnings.length && (wan || nets.length || hasLan)) warnings.push('已保留上次检测结果，状态可能已过期');
+        if(!detected.interfaces) warnings.push('接口检测失败，无法确认 WAN/LAN 是否存在'+(detected.errors && detected.errors.interfaces ? '：'+detected.errors.interfaces : ''));
+        if(!detected.wireless) warnings.push('无线检测失败，无法确认无线接口是否存在'+(detected.errors && detected.errors.wireless ? '：'+detected.errors.wireless : ''));
+        if(detected.errors && detected.errors.interfaceConfig)warnings.push('网络配置读取失败：'+detected.errors.interfaceConfig);
+        if(detected.errors && detected.errors.wirelessConfig)warnings.push('无线配置读取失败：'+detected.errors.wirelessConfig);
+        if(detected.interfacesConfigured || detected.wirelessConfigured) warnings.push('按已保存配置展示，运行状态未知，不能据此确认物理接口存在');
+        if((!detected.interfaces && !detected.interfacesConfigured && (wan || hasLan)) || (!detected.wireless && !detected.wirelessConfigured && nets.length)) warnings.push('已保留上次检测结果，状态可能已过期');
         var channels=[], clients=[];
         shownBands.forEach(function(band){
             var group=groups[band], title=bandName(band);
@@ -316,8 +381,8 @@ return view.extend({
                 clientSummary(group),'该频段关联'+clientSummary(group),L.url('admin/status/overview')));
         });
         if(hasLan){
-            channels.push(node('nv-radio','▤','有线 LAN',lanDev || '未连接','有线设备数暂不可判定 · '+lanSummary,L.url('admin/network/network')));
-            clients.push(node('nv-client','▤','LAN',lan.device||lanDev||'未连接','有线端口和设备详情请查看接口设置',L.url('admin/network/network')));
+            channels.push(node('nv-radio','▤','有线 LAN',lanDev || (detected.interfaces?'未连接':'状态未知'),'有线设备数暂不可判定 · '+lanSummary,L.url('admin/network/network')));
+            clients.push(node('nv-client','▤','LAN',lan.device||lanDev||(detected.interfaces?'未连接':'状态未知'),'有线端口和设备详情请查看接口设置',L.url('admin/network/network')));
         }
         var path=[];
         if(wan){
@@ -335,7 +400,7 @@ return view.extend({
         var pathStats=[];
         if(nets.length){
             pathStats.push(el('div','',[label('客户端'),el('strong','',clientsKnown?String(totalClients):'—'),el('small','',clientsKnown?totalClients+' 个 Wi-Fi 已关联':'客户端信息不可用')]));
-            pathStats.push(el('div','',[label('无线频段'),el('strong','',visibleBands ? visibleBands+' 个已检测':'频段未知'),el('small','',nets.length+' 个无线配置')]));
+            pathStats.push(el('div','',[label('无线频段'),el('strong','',visibleBands ? visibleBands+(detected.wirelessConfigured?' 个已配置':' 个已检测'):'频段未知'),el('small','',nets.length+' 个无线配置')]));
             pathStats.push(el('div','',[label('最弱信号'),el('strong','',worst!=null?worst+' dBm':'—'),el('small','',worst!=null?'来自已关联 Wi-Fi 客户端':'暂无客户端信号数据')]));
         }
         if(wan)pathStats.push(el('div','',[label('当前流量'),E('strong',{'data-nova':'path-flow'},!detected.interfaces?'状态未知':conn?'等待采样':'未连接'),el('small','',wanLabel(wan))]));
@@ -392,7 +457,7 @@ return view.extend({
         if(wan)panels.unshift(trend);
         var bottom=panels.length ? el('div','nv-bottom-grid',panels) : null;
         var notice=warnings.length ? E('p',{'class':'nv-detection-warning','role':'status'},warnings.join('；')+'。正在自动重试。') : null;
-        var root=E('div',{'class':'nova-dashboard'},[header,notice,cards,mainCard,bottom]);
+        var root=E('div',{'class':'nova-dashboard'},children([header,notice,cards,mainCard,bottom]));
         var styleHref=L.resource('nova/dashboard.css')+'?v='+dashboardAssetVersion;
         var style=document.getElementById('nova-dashboard-style');
         if(!style){
@@ -415,9 +480,11 @@ return view.extend({
         function refresh(){
             return readDetection().then(function(d){
                 var next=data.slice();
-                next[8]={interfaces:d[0]!==null,wireless:d[1]!==null};
-                if(d[0]!==null)next[2]=d[0];
-                if(d[1]!==null){next[9]=d[1];next[3]=wifiNetworks(d[1]);}
+                next[8]={interfaces:d[0]!==null,wireless:d[1]!==null,errors:d[2],interfacesConfigured:!!data[8].interfacesConfigured,wirelessConfigured:!!data[8].wirelessConfigured};
+                if(d[0]!==null){next[2]=d[0];next[8].interfacesConfigured=false;}
+                else if(d[3]!==null && (!next[2] || next[8].interfacesConfigured)){next[2]=d[3];next[8].interfacesConfigured=true;}
+                if(d[1]!==null){next[9]=d[1];next[3]=wifiNetworks(d[1]);next[8].wirelessConfigured=false;}
+                else if(d[4]!==null && (!next[9] || next[8].wirelessConfigured)){next[9]=d[4];next[3]=wifiNetworks(d[4]);next[8].wirelessConfigured=true;}
                 return readStations(next[3]).then(function(stations){
                     next[7]=stations;
                     if(!root.isConnected || self._novaPoll!==update)return false;
