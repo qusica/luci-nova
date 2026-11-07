@@ -27,8 +27,7 @@ ${[['status','状态'],['system','系统'],['network','网络']].map(([route,nam
 <script>${shell}</script><script>
 (async function(){try{
 const mode = new URLSearchParams(location.search).get('case') || 'full';
-const tags=['svg','polyline','line'];
-function E(tag,attrs={},children=[]){const e=tags.includes(tag)?document.createElementNS('http://www.w3.org/2000/svg',tag):document.createElement(tag);for(const [key,value] of Object.entries(attrs)){if(typeof value==='function')e.addEventListener(key,value);else if(typeof value==='boolean'){if(value)e.setAttribute(key,'');}else e.setAttribute(key,value);}for(const child of Array.isArray(children)?children:[children])e.append(child);return e;}
+function E(tag,attrs={},children=[]){const e=document.createElement(tag);for(const [key,value] of Object.entries(attrs)){if(typeof value==='function')e.addEventListener(key,value);else if(typeof value==='boolean'){if(value)e.setAttribute(key,'');}else e.setAttribute(key,value);}for(const child of Array.isArray(children)?children:[children])e.append(child);return e;}
 const wifi=(band,frequency,channel)=>({up:true,config:{band},interfaces:[{section:'wifi_'+band,ifname:'phy-'+band,config:{ssid:'Nova Studio'},iwinfo:{ssid:'Nova Studio',frequency,channel,txpower:20,noise:-94}}]});
 const radios=mode==='full'?{radio0:wifi('2g',2437,6),radio1:wifi('5g',5180,36)}:{};
 const polls=[];
@@ -66,7 +65,7 @@ test('Quiet Slate visual hierarchy, accessible contrast and responsive containme
    for(let i=0;i<100;i++){if(await evaluate('window.visualReady||window.visualError||false'))break;await new Promise(r=>setTimeout(r,30));}
    assert.equal(await evaluate('window.visualError'),undefined);
    assert.equal(await evaluate('window.visualReady'),true);
-   const state=await evaluate(`({width:document.documentElement.clientWidth,scroll:document.documentElement.scrollWidth,icons:[...document.querySelectorAll('.nv-icon')].every(e=>e.namespaceURI==='http://www.w3.org/2000/svg'&&e.getAttribute('aria-hidden')==='true'),palette:getComputedStyle(document.body).getPropertyValue('--nova-accent').trim(),metrics:document.querySelectorAll('.nv-metric').length,checks:[['.nv-metric-label','.nv-metric'],['.nv-metric-sub','.nv-metric'],['.nv-detection-warning','.nv-detection-warning'],['.nova-list-note','.nova-list-group'],['.nova-sidebar-foot','header']].filter(([a,b])=>document.querySelector(a)&&document.querySelector(b)).map(([a,b])=>({name:a,fg:getComputedStyle(document.querySelector(a)).color,bg:getComputedStyle(document.querySelector(b)).backgroundColor}))})`);
+   const state=await evaluate(`({width:document.documentElement.clientWidth,scroll:document.documentElement.scrollWidth,icons:[...document.querySelectorAll('.nv-icon')].every(e=>e.namespaceURI==='http://www.w3.org/2000/svg'&&e.getAttribute('aria-hidden')==='true'&&e.viewBox.baseVal.width===24&&e.getBBox().width>0&&e.getBBox().height>0&&[...e.children].every(c=>c.namespaceURI===e.namespaceURI)),palette:getComputedStyle(document.body).getPropertyValue('--nova-accent').trim(),metrics:document.querySelectorAll('.nv-metric').length,checks:[['.nv-metric-label','.nv-metric'],['.nv-metric-sub','.nv-metric'],['.nv-detection-warning','.nv-detection-warning'],['.nova-list-note','.nova-list-group'],['.nova-sidebar-foot','header']].filter(([a,b])=>document.querySelector(a)&&document.querySelector(b)).map(([a,b])=>({name:a,fg:getComputedStyle(document.querySelector(a)).color,bg:getComputedStyle(document.querySelector(b)).backgroundColor}))})`);
    assert.ok(state.scroll<=state.width+1,`${width}/${scenario} page overflow: ${JSON.stringify(state)}`);
    assert.ok(state.icons);assert.equal(state.palette,'#9bc1f1');
    if(scenario==='failed')assert.equal(state.metrics,3,'failed inventory invents metric cards');

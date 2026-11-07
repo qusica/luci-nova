@@ -22,3 +22,13 @@ Presentation only: CSS, decorative dashboard SVGs, favicon and asset cache versi
 The visual browser test uses actual Nova source and explicitly synthetic RPC responses. It exercises a populated dashboard, detection failure and representative native form controls at 320, 390, 768, 1024 and 1440 px. It checks whole-document horizontal containment, decorative SVG semantics and minimum 4.5:1 contrast for sampled small labels. Screenshots are design fixtures, not evidence that a test router has PPPoE or Wi-Fi.
 
 The existing source/packaged suites still cover detected inventory, disabled/down radios, recovery, honest unavailable states, preserved native lists and real pointer/keyboard/touch menu operation. The visual suite runs against extracted APK assets too. Live router acceptance remains a separate check and must not be inferred from fixture success.
+
+
+## Native-LuCI correction in 0.2.7
+
+Live 0.2.6 acceptance found blank SVG ornaments: LuCI's generic `E()` creates
+HTML-namespace nodes, while the original browser fixture silently created SVG
+nodes for those tags. The fixture was too permissive. Version 0.2.7 uses explicit
+`document.createElementNS` for every icon/chart root and shape, with faithful
+HTML-only fixture `E()` implementations and actual rendered-geometry assertions.
+Package/cache versions advance because 0.2.6 had already been installed.

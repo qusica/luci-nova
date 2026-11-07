@@ -5,7 +5,7 @@
 'require fs';
 
 // Keep in sync with PKG_VERSION; tests enforce this cache key on every release.
-var dashboardAssetVersion = '0.2.6';
+var dashboardAssetVersion = '0.2.7';
 
 var getBoard = rpc.declare({ object: 'system', method: 'board' });
 var getInfo = rpc.declare({ object: 'system', method: 'info' });
@@ -174,6 +174,14 @@ function children(contents) {
 function el(kind, klass, contents){return E(kind, {'class':klass}, children(contents));}
 // All dashboard ornaments use one line-icon family. They are decorative, not
 // health checks: unavailable CPU/storage/network data must never get a checkmark.
+// LuCI E() uses document.createElement, including for an "svg" tag. SVG roots
+// and their shapes must be created explicitly in the SVG namespace.
+function svg(kind, attrs, content) {
+    var element = document.createElementNS('http://www.w3.org/2000/svg', kind);
+    Object.keys(attrs || {}).forEach(function(key){element.setAttribute(key,attrs[key]);});
+    (content || []).forEach(function(child){element.appendChild(child);});
+    return element;
+}
 function icon(kind) {
     var paths = {
         cpu:['7,7 17,7 17,17 7,17 7,7','10,10 14,10 14,14 10,14 10,10','9,3 9,7','15,3 15,7','9,17 9,21','15,17 15,21','3,9 7,9','3,15 7,15','17,9 21,9','17,15 21,15'],
@@ -189,9 +197,9 @@ function icon(kind) {
         path:['3,5 9,5 9,11 3,11 3,5','15,13 21,13 21,19 15,19 15,13','6,11 6,16 15,16','18,13 18,8 9,8'],
         activity:['2,13 6,13 9,5 14,20 17,10 19,13 22,13']
     };
-    return E('svg', {'class':'nv-icon','viewBox':'0 0 24 24','fill':'none','stroke':'currentColor',
+    return svg('svg', {'class':'nv-icon','viewBox':'0 0 24 24','fill':'none','stroke':'currentColor',
         'stroke-width':'1.6','stroke-linecap':'round','stroke-linejoin':'round','aria-hidden':'true','focusable':'false'},
-        (paths[kind] || paths.activity).map(function(points){return E('polyline',{'points':points});}));
+        (paths[kind] || paths.activity).map(function(points){return svg('polyline',{'points':points});}));
 }
 function metric(name,value,detail,key){
     return el('div','nv-metric',[
@@ -283,9 +291,9 @@ function wifiCard(band,g){
             detailLine('接口', net&&net.getIfname&&net.getIfname() || '—')
         ]),
         el('div','nv-mini-chart',[
-            E('svg',{'viewBox':'0 0 360 76','preserveAspectRatio':'none','aria-label':bandName(band)+' 实时吞吐量'},[
-                E('line',{'x1':'0','y1':'65','x2':'360','y2':'65','class':'nv-axis'}),
-                E('polyline',{'data-nova':'wifi-'+id,'class':'nv-spark','points':'0,65 360,65'})
+            svg('svg',{'viewBox':'0 0 360 76','preserveAspectRatio':'none','aria-label':bandName(band)+' 实时吞吐量'},[
+                svg('line',{'x1':'0','y1':'65','x2':'360','y2':'65','class':'nv-axis'}),
+                svg('polyline',{'data-nova':'wifi-'+id,'class':'nv-spark','points':'0,65 360,65'})
             ]),
             E('span',{'data-nova':'wifi-rate-'+id,'class':'nv-mini-rate'},net && net.isKnown && !net.isKnown() ? '运行状态未知' : net && net.isUp && net.isUp() ? '等待采样' : '接口未连接')
         ])
@@ -467,12 +475,12 @@ return view.extend({
                     E('span',{'data-nova':'traffic-up','class':'nv-upload-label'},!detected.interfaces?'—':conn?'↑ 等待采样':'—'),
                     E('small',{},['峰值 ',E('span',{'data-nova':'traffic-peak'},'—')])
                 ]),
-                E('svg',{'class':'nv-traffic-chart','viewBox':'0 0 600 150','preserveAspectRatio':'none','role':'img','aria-label':'WAN 实时上下行速率'},[
-                    E('line',{'class':'nv-gridline','x1':'0','y1':'37','x2':'600','y2':'37'}),
-                    E('line',{'class':'nv-gridline','x1':'0','y1':'76','x2':'600','y2':'76'}),
-                    E('line',{'class':'nv-gridline','x1':'0','y1':'115','x2':'600','y2':'115'}),
-                    E('polyline',{'class':'nv-line-down','data-nova':'down-path','points':'0,145 600,145'}),
-                    E('polyline',{'class':'nv-line-up','data-nova':'up-path','points':'0,145 600,145'})
+                svg('svg',{'class':'nv-traffic-chart','viewBox':'0 0 600 150','preserveAspectRatio':'none','role':'img','aria-label':'WAN 实时上下行速率'},[
+                    svg('line',{'class':'nv-gridline','x1':'0','y1':'37','x2':'600','y2':'37'}),
+                    svg('line',{'class':'nv-gridline','x1':'0','y1':'76','x2':'600','y2':'76'}),
+                    svg('line',{'class':'nv-gridline','x1':'0','y1':'115','x2':'600','y2':'115'}),
+                    svg('polyline',{'class':'nv-line-down','data-nova':'down-path','points':'0,145 600,145'}),
+                    svg('polyline',{'class':'nv-line-up','data-nova':'up-path','points':'0,145 600,145'})
                 ])
             ]),
             el('div','nv-chart-note','显示实际采样数据；尚未采样时不生成模拟曲线。')

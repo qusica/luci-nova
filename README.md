@@ -2,7 +2,7 @@
 
 Nova is a dark LuCI theme and a companion status dashboard for OpenWrt and ImmortalWrt.
 
-> Preview 0.2.6: detected interface cards, live PPPoE status and searchable native LuCI lists. This is still experimental and has not been tested on every router or firmware. Keep Bootstrap installed for safe rollback.
+> Preview 0.2.7: detected interface cards, live PPPoE status and searchable native LuCI lists. This is still experimental and has not been tested on every router or firmware. Keep Bootstrap installed for safe rollback.
 
 ## Packages
 
@@ -131,6 +131,12 @@ rejects that mistake. To run the same comparison locally, set
 
 Project-authored files: MIT. Templates adapted from the LuCI Bootstrap theme retain their upstream Apache-2.0 notices.
 
+## What's new in 0.2.7
+
+- Fix an actual native-LuCI rendering issue: dashboard SVG icons and charts now explicitly use the SVG namespace. LuCI's generic `E()` creates HTML elements even when the tag is `svg`, so that helper cannot create working vectors.
+- Browser fixtures now reproduce LuCI's actual HTML-only `E()` behavior. Regression checks verify SVG namespace, case-sensitive viewBox attributes and nonempty rendered icon geometry, including extracted APKs.
+- Asset versions advance again because 0.2.6 was installed during live acceptance. The Quiet Slate palette and all data/configuration behavior are unchanged.
+
 ## What's new in 0.2.6
 
 - **Quiet Slate:** a unified graphite and ice-blue visual system across navigation, native LuCI forms, the dashboard, lists and the favicon. Mint indicates live activity, amber marks warnings, and lavender distinguishes uploads. No fluorescent lime accents remain.
@@ -185,7 +191,7 @@ Detection uses strict `network.interface dump` and `network.wireless status` rea
 
 ### Updating an existing installation
 
-Make sure to download the fresh 0.2.6 packages from a **successful** CI run.
+Make sure to download the fresh 0.2.7 packages from a **successful** CI run.
 Install both packages again using your device's normal package-manager update/upgrade procedure,
 and reload the browser without cached assets. SSH rollback remains available above.
 

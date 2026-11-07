@@ -3,7 +3,7 @@ include $(TOPDIR)/rules.mk
 LUCI_TITLE:=Nova Status Dashboard
 LUCI_DEPENDS:=+luci-base
 PKG_LICENSE:=MIT
-PKG_VERSION:=0.2.6
+PKG_VERSION:=0.2.7
 PKG_RELEASE:=1
 
 # Bundle Nova's own native catalog so the normal two-package installation also
