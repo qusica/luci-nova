@@ -35,7 +35,7 @@ jobs:
           node --check luci-theme-nova/htdocs/luci-static/nova/nova-shell.js
           node --check luci-theme-nova/htdocs/luci-static/nova/nova-lists.js
       - name: Test dashboard rendering
-        run: node --test tests/dashboard.test.js tests/native-lists.test.js
+        run: node --test tests/dashboard.test.js tests/native-lists.test.js tests/navigation.test.js tests/menu-localization.test.js
       - name: Test asset cache versions
         env:
           NOVA_ASSET_BASE: ${{ github.event.before }}

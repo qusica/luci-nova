@@ -1,6 +1,6 @@
 {
   "admin/nova": {
-    "title": "仪表盘",
+    "title": "Nova Dashboard",
     "order": -100,
     "action": {
       "type": "view",

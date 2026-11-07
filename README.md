@@ -2,12 +2,12 @@
 
 Nova is a dark LuCI theme and a companion status dashboard for OpenWrt and ImmortalWrt.
 
-> Preview 0.2.4: detected interface cards, live PPPoE status and searchable native LuCI lists. This is still experimental and has not been tested on every router or firmware. Keep Bootstrap installed for safe rollback.
+> Preview 0.2.5: detected interface cards, live PPPoE status and searchable native LuCI lists. This is still experimental and has not been tested on every router or firmware. Keep Bootstrap installed for safe rollback.
 
 ## Packages
 
 - `luci-theme-nova` — dark visual theme, with Bootstrap as its supported base.
-- `luci-app-nova-dashboard` — independent LuCI dashboard under **Dashboard / 仪表盘** (also available via **Status → Nova Dashboard**).
+- `luci-app-nova-dashboard` — independent LuCI dashboard under **Nova Dashboard / Nova 仪表盘** (also available via **Status → Nova Dashboard**).
 
 ## IPK and APK builds
 
@@ -82,7 +82,7 @@ The output suffix (`.ipk` or `.apk`) is decided by the SDK. Prefer official vers
 Run the dependency-free dashboard rendering tests with Node.js 18 or newer:
 
 ```sh
-node --test tests/dashboard.test.js tests/native-lists.test.js
+node --test tests/dashboard.test.js tests/native-lists.test.js tests/navigation.test.js tests/menu-localization.test.js
 node --test tests/asset-version.test.js
 node --check luci-app-nova-dashboard/htdocs/luci-static/resources/view/nova/dashboard.js
 node --check luci-theme-nova/htdocs/luci-static/nova/nova-shell.js
@@ -123,6 +123,12 @@ rejects that mistake. To run the same comparison locally, set
 ## License
 
 Project-authored files: MIT. Templates adapted from the LuCI Bootstrap theme retain their upstream Apache-2.0 notices.
+
+## What's new in 0.2.5
+
+- Consistent line icons identify menu categories by their LuCI route, so translating, hiding or reordering categories cannot change their meaning. Dashboard uses tiles, Status uses an activity trace, System uses a gear, Network uses a connected topology, and Logout uses an exit arrow.
+- Parent and submenu labels share a text column. Disclosure arrows sit at the right edge, and tablet keyboard/touch dropdowns no longer inherit Bootstrap's offscreen position.
+- Nova's two menu entries use the native LuCI translation catalog. Simplified Chinese shows **Nova 仪表盘**, while English keeps **Nova Dashboard**. The catalog is bundled into the dashboard APK; other apps retain their own translations. See [menu localization](docs/menu-localization.md).
 
 ## What's new in 0.2.3
 
