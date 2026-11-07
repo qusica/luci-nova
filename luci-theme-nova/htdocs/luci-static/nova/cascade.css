@@ -145,14 +145,64 @@ footer a{color:var(--nova-muted)}
 button,input,select,textarea{font:inherit}
 input[type="checkbox"],input[type="radio"]{accent-color:var(--nova-accent)}
 a,button,input,select,textarea,summary{touch-action:manipulation}
-button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,summary:focus-visible{
+button:focus-visible,a:focus-visible,summary:focus-visible,input[type="checkbox"]:focus-visible,input[type="radio"]:focus-visible{
  outline:2px solid var(--nova-accent);outline-offset:3px}
+/* Text fields use the native dropdown's soft halo instead of a detached
+ * outline. The lit border stays crisp enough for keyboard focus; errors keep
+ * their own color, and forced-colors mode gets a system focus outline. */
+input,select,textarea,.cbi-dropdown{
+ --nova-field-glow:155,193,241;--nova-field-edge:var(--nova-accent);
+ transition:border-color .16s ease,box-shadow .16s ease
+}
+input:not([type="checkbox"],[type="radio"],[type="button"],[type="submit"],[type="reset"],[type="range"],[type="color"],[type="image"],[type="file"],[type="hidden"]):focus,
+textarea:focus,select:focus,.cbi-select.focus,
+.cbi-dropdown:not(.btn):not(.cbi-button):focus,
+.cbi-dropdown:not(.btn):not(.cbi-button):focus-within,
+.cbi-dropdown:not(.btn):not(.cbi-button)[open]{
+ outline:none!important;border-color:var(--nova-field-edge)!important;
+ box-shadow:0 0 0 1px rgba(var(--nova-field-glow),.12),0 0 10px rgba(var(--nova-field-glow),.34)
+}
+.nova-search-wrap:focus-within{
+ border-color:var(--nova-accent);box-shadow:0 0 0 1px rgba(155,193,241,.12),0 0 10px rgba(155,193,241,.34)
+}
+.cbi-input-invalid,.cbi-dropdown.cbi-input-invalid:not(.btn):not(.cbi-button),
+.cbi-dropdown[aria-invalid="true"]:not(.btn):not(.cbi-button),.cbi-value-error input,.cbi-value-error textarea,
+input[aria-invalid="true"],select[aria-invalid="true"],textarea[aria-invalid="true"],.cbi-dropdown[aria-invalid="true"]{
+ --nova-field-glow:232,160,160;--nova-field-edge:#e8a0a0;border-color:#e8a0a0!important
+}
+input[readonly],textarea[readonly]{background:var(--nova-surface)!important;color:var(--nova-muted)!important}
+input:disabled,select:disabled,textarea:disabled,.cbi-dropdown[disabled]:not(.btn):not(.cbi-button),.cbi-dropdown[aria-disabled="true"]:not(.btn):not(.cbi-button){
+ opacity:.62;cursor:not-allowed;box-shadow:none!important;border-color:var(--nova-border)!important
+}
+@media(forced-colors:active){
+ input:focus-visible,select:focus-visible,textarea:focus-visible,.cbi-dropdown:focus-visible,.cbi-dropdown:focus-within{
+  outline:2px solid Highlight!important;outline-offset:2px;box-shadow:none!important;border-color:Highlight!important}
+}
 .btn.primary:hover,.cbi-button-positive:hover,.cbi-button-apply:hover{background:var(--nova-accent-hover)!important}
 button:disabled,.cbi-button:disabled{cursor:not-allowed}
 .nova-refresh:focus-visible{outline:2px solid var(--nova-accent);outline-offset:3px}
 .nova-brand-mark{box-shadow:inset 0 1px 0 rgba(255,255,255,.06)}
 #topmenu>li.active>a{box-shadow:inset 3px 0 var(--nova-accent)}
 #topmenu .dropdown-menu a{line-height:1.6}
+/* Keep the familiar native tab shape, with breathing room and usable targets. */
+#tabmenu .tabs,.cbi-tabmenu{
+ display:flex;flex-wrap:wrap;align-items:stretch;gap:6px;margin:0 0 18px;padding:0 2px;
+ background:none;border-bottom:1px solid var(--nova-border)
+}
+#tabmenu .tabs>li,.cbi-tabmenu>li{
+ height:auto;min-height:38px;max-width:100%;margin:0;padding:0;
+ border-radius:7px 7px 0 0;background:var(--nova-surface)
+}
+#tabmenu .tabs>li>a,.cbi-tabmenu>li>a{
+ display:flex;align-items:center;min-height:38px;padding:8px 12px;line-height:20px;
+ border-radius:6px 6px 0 0;max-width:100%;box-sizing:border-box
+}
+#tabmenu .tabs>li>a:focus-visible,.cbi-tabmenu>li>a:focus-visible{
+ outline-offset:-3px;text-decoration:underline;text-underline-offset:3px
+}
+@media(max-width:640px){
+ #tabmenu .tabs>li>a,.cbi-tabmenu>li>a{min-height:40px;padding:9px 12px}
+}
 #tabmenu .tabs>li>a,.cbi-tabmenu>li>a{color:var(--nova-muted)}
 #tabmenu .tabs>li.active>a,.cbi-tabmenu>li.cbi-tab>a{color:var(--nova-accent-hover)}
 .cbi-map{box-shadow:none}

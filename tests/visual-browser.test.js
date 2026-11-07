@@ -16,7 +16,7 @@ function fixture() {
     const shell = read('luci-theme-nova/htdocs/luci-static/nova/nova-shell.js');
     const dashboard = read('luci-app-nova-dashboard/htdocs/luci-static/resources/view/nova/dashboard.js');
     return `<!doctype html><html data-darkmode="true" lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<style>*{box-sizing:border-box}body{margin:0}ul{list-style:none;margin:0;padding:0}a{text-decoration:none;cursor:pointer}button{cursor:pointer}button,input{font-family:inherit}.cbi-value{padding:12px 0;display:flex;gap:20px;border-bottom:1px solid}.cbi-value-title{width:160px}.cbi-value-field{flex:1}.cbi-value input,.cbi-value select{padding:8px 10px;max-width:100%}.cbi-button{padding:8px 14px;border:1px solid #45576c;background:#202a35;color:#e9eef5}.table{width:100%;border-collapse:collapse}.table td,.table th{padding:12px;border-bottom:1px solid #303d4c;text-align:left}.table th{color:#a6b3c2;font-weight:500}.cbi-page-actions{display:flex;gap:10px;justify-content:flex-end}.cbi-tabmenu{display:flex;gap:20px;margin:0 0 20px}.cbi-tabmenu li{padding:8px}.cbi-value-description{font-size:12px;margin-top:5px}@media(max-width:640px){.cbi-value{display:block}.cbi-value-title{display:block;margin-bottom:8px}}
+<style>*{box-sizing:border-box}body{margin:0}ul{list-style:none;margin:0;padding:0}a{text-decoration:none;cursor:pointer}button{cursor:pointer}button,input{font-family:inherit}.cbi-value{padding:12px 0;display:flex;gap:20px;border-bottom:1px solid}.cbi-value-title{width:160px}.cbi-value-field{flex:1}.cbi-value input,.cbi-value select{padding:8px 10px;max-width:100%}.cbi-button{padding:8px 14px;border:1px solid #45576c;background:#202a35;color:#e9eef5}.table{width:100%;border-collapse:collapse}.table td,.table th{padding:12px;border-bottom:1px solid #303d4c;text-align:left}.table th{color:#a6b3c2;font-weight:500}.cbi-page-actions{display:flex;gap:10px;justify-content:flex-end}.cbi-tabmenu{display:flex;gap:20px;margin:0 0 20px}.cbi-tabmenu li{height:25px;margin:4px 2px 0;padding:0}.cbi-tabmenu li a{line-height:25px;padding:4px 6px}.cbi-value-description{font-size:12px;margin-top:5px}@media(max-width:640px){.cbi-value{display:block}.cbi-value-title{display:block;margin-bottom:8px}}
 </style><style>${theme}\n${lists}</style>
 <header><a class="brand" href="#"><span class="nova-brand-mark">N</span><span class="nova-brand-name">Nova</span></a><ul id="topmenu">
 <li class="active"><a href="/cgi-bin/luci/admin/nova">Nova 仪表盘</a></li>
@@ -39,6 +39,20 @@ return Promise.resolve(key==='system.board'?{hostname:'nova-lab',model:'OpenWrt 
 const data=await app.load();document.querySelector('#view').append(app.render(data));
 for(const fn of polls)await fn();
 if(mode==='native'){document.querySelector('#view').replaceChildren();document.querySelector('.nova-current-page').textContent='系统';document.querySelector('#view').innerHTML='<h2>系统</h2><p class="cbi-map-descr">配置此设备的基本信息。</p><ul class="cbi-tabmenu"><li class="cbi-tab"><a>常规设置</a></li><li><a>时间同步</a></li><li><a>语言和界面</a></li></ul><section class="cbi-section"><h3>常规设置</h3><div class="cbi-value"><label class="cbi-value-title" for="host">主机名</label><div class="cbi-value-field"><input id="host" value="nova-lab"><div class="cbi-value-description">用于在网络中识别此设备。</div></div></div><div class="cbi-value"><label class="cbi-value-title" for="zone">时区</label><div class="cbi-value-field"><select id="zone"><option>Asia/Shanghai</option></select></div></div><div class="cbi-value"><label class="cbi-value-title" for="sync">启用 NTP 客户端</label><div class="cbi-value-field"><input id="sync" type="checkbox" checked></div></div></section><section class="cbi-section"><h3>接口状态</h3><table class="table"><tr><th>接口</th><th>协议</th><th>状态</th></tr><tr><td>internet</td><td>PPPoE</td><td>已连接</td></tr><tr><td>lan</td><td>静态地址</td><td>已连接</td></tr></table></section><div class="cbi-page-actions"><button class="cbi-button">重置</button><button class="cbi-button">保存</button><button class="cbi-button cbi-button-apply">保存并应用</button></div>';}
+if(mode==='native'){
+ document.querySelectorAll('.cbi-tabmenu a').forEach((a,i)=>a.setAttribute('href','#tab-'+i));
+ const fields=[
+  ['notes','备注','<textarea id="notes">Example note</textarea>'],
+  ['count','MTU','<input id="count" type="number" value="1500">'],
+  ['email','联系邮箱','<input id="email" type="email" value="test@example.invalid">'],
+  ['password','测试密码','<input id="password" type="password" value="fixture-only">'],
+  ['destination','目标（错误示例）','<input id="destination" class="cbi-input-invalid" aria-invalid="true" aria-describedby="destination-error" placeholder="0.0.0.0/0"><div id="destination-error" class="cbi-value-description">期望：不能为空</div>'],
+  ['disabled-field','已禁用','<input id="disabled-field" disabled value="不可编辑">'],
+  ['readonly-field','只读','<input id="readonly-field" readonly value="只读值">'],
+  ['custom-dropdown','路由表','<div id="custom-dropdown" class="cbi-dropdown" tabindex="0" role="combobox" aria-label="路由表" aria-expanded="false" style="width:210px;max-width:100%;padding:7px 10px">未指定</div>']
+ ];
+ document.querySelector('.cbi-section').insertAdjacentHTML('beforeend',fields.map(([id,name,html])=>'<div class="cbi-value"><label class="cbi-value-title" for="'+id+'">'+name+'</label><div class="cbi-value-field">'+html+'</div></div>').join(''));
+}
 await new Promise(resolve=>{const link=document.querySelector('#nova-dashboard-style');if(link.sheet)resolve();else link.addEventListener('load',resolve,{once:true});});
 window.visualReady=true;
 }catch(e){window.visualError=e.message;}})();
@@ -76,6 +90,26 @@ test('Quiet Slate visual hierarchy, accessible contrast and responsive containme
     assert.equal(label.size,'11px',`${width}/${scenario} ${label.name} small-label size`);
    }
    for(const check of state.checks){const a=luminance(check.fg),b=luminance(check.bg);assert.ok((Math.max(a,b)+.05)/(Math.min(a,b)+.05)>=4.5,`${check.name} contrast at ${width}`);}
+   if(scenario==='native'){
+    const tabs=await evaluate("[...document.querySelectorAll('.cbi-tabmenu a')].map(e=>({height:e.getBoundingClientRect().height,width:e.getBoundingClientRect().width}))");
+    assert.ok(tabs.length===3&&tabs.every(t=>t.height>=38&&t.width>40),'native tabs need comfortable hit targets');
+    for(const selector of ['#host','#zone','#notes','#count','#email','#password','#readonly-field','#custom-dropdown']){
+     const focused=await evaluate(`(async()=>{const e=document.querySelector('${selector}');e.focus();await new Promise(r=>setTimeout(r,200));const s=getComputedStyle(e);return {active:document.activeElement===e,outline:s.outlineStyle,shadow:s.boxShadow,border:s.borderColor};})()`);
+     assert.equal(focused.active,true,selector+' remains focusable');
+     assert.equal(focused.outline,'none',selector+' must not use a detached hard outline');
+     assert.equal(focused.border,'rgb(155, 193, 241)',selector+' has a visible focused edge');
+     assert.match(focused.shadow,/10px/,selector+' has a soft halo');
+    }
+    const states=await evaluate(`(async()=>{const e=document.querySelector('#destination');e.focus();await new Promise(r=>setTimeout(r,200));const invalid=getComputedStyle(e),disabled=getComputedStyle(document.querySelector('#disabled-field'));return {invalidBorder:invalid.borderColor,invalidShadow:invalid.boxShadow,invalidOutline:invalid.outlineStyle,errorVisible:!!document.querySelector('#destination-error').textContent,disabledShadow:disabled.boxShadow,disabledCursor:disabled.cursor,disabled:document.querySelector('#disabled-field').disabled,readonly:document.querySelector('#readonly-field').readOnly};})()`);
+    assert.equal(states.invalidBorder,'rgb(232, 160, 160)');assert.match(states.invalidShadow,/232, 160, 160/);assert.equal(states.invalidOutline,'none');assert.ok(states.errorVisible);
+    assert.equal(states.disabledShadow,'none');assert.equal(states.disabledCursor,'not-allowed');assert.ok(states.disabled&&states.readonly);
+    await send('Emulation.setEmulatedMedia',{features:[{name:'forced-colors',value:'active'}]});
+    const highContrast=await evaluate("(()=>{const e=document.querySelector('#host');e.focus();const s=getComputedStyle(e);return {outline:s.outlineStyle,width:s.outlineWidth};})()");
+    assert.equal(highContrast.outline,'solid');assert.equal(highContrast.width,'2px');
+    await send('Emulation.setEmulatedMedia',{features:[]});
+    await evaluate("document.querySelector('#host').focus()");
+    console.log(`${width}/native: soft focus, error/disabled/readonly states, forced colors, roomy tabs`);
+   }
    if(process.env.NOVA_SCREENSHOT_DIR&&[1440,390].includes(width)){
     fs.mkdirSync(process.env.NOVA_SCREENSHOT_DIR,{recursive:true});
     const {contentSize}=await send('Page.getLayoutMetrics');

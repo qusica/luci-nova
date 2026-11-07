@@ -133,6 +133,12 @@ Project-authored files: MIT. Templates adapted from the LuCI Bootstrap theme ret
 
 ## What's new in 0.2.8
 
+- Give text inputs, selects, textareas and native dropdowns a gentle focus glow
+  rather than a detached outline. Invalid fields retain red borders and glow;
+  disabled fields remain quiet. Forced-colors mode keeps a system focus outline.
+- Make native tab targets 38 px high (40 px on narrow screens) with more padding
+  and gaps, preserving native tab behavior and keyboard access.
+
 - Preserve CSS bytes through packaging. The SDK's csstidy optimizer was observed
   replacing muted-label declarations with an unrelated radio-meter background.
 - Verify every packaged stylesheet against source, plus exact small-label color,

@@ -42,3 +42,16 @@ background. Both packages now use the supported `LUCI_MINIFY_CSS:=0` switch.
 APK compression still applies and JavaScript remains minified. Packaged tests
 compare every CSS file byte-for-byte with source and visual tests verify the
 affected labels' exact foreground, transparent background and 11 px size.
+
+## Input and tab feedback in 0.2.8
+
+The user preferred the subtle glow on LuCI's route-table dropdown over the
+hard detached outline on an invalid destination field. Text inputs, selects,
+textareas and native dropdowns now use a light ice-blue border and a soft
+10 px glow on focus. Invalid fields retain their own red border/glow and
+native error message. Disabled fields have no glow; read-only fields keep
+muted colors and focusability. System outlines remain in forced-colors mode.
+Native tabs keep their familiar shape, with 38 px minimum target height,
+40 px on narrow screens, 12 px horizontal padding and 6 px gaps. They can
+wrap rather than creating whole-page horizontal overflow. The browser suite
+checks these states at all five visual widths as well as the original gates.
