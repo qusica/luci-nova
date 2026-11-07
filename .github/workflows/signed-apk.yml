@@ -2,7 +2,7 @@ name: Build signed APK packages
 
 on:
   push:
-    branches: [main]
+    branches: [main, ci/sign-nova-0.2.3-test]
     tags: ['v*']
   workflow_dispatch:
 
@@ -115,3 +115,73 @@ jobs:
             ${{ runner.temp }}/nova-release-signed/BUILD-SOURCE.txt
           if-no-files-found: error
           retention-days: 30
+
+  development-test-once:
+    # Temporary branch only. Production build/sign gates above stay unchanged.
+    if: github.repository == 'qusica/luci-nova' && github.event_name == 'push' && github.ref == 'refs/heads/ci/sign-nova-0.2.3-test' && github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - name: Checkout reviewed one-time guard only
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+          path: guard
+          sparse-checkout: |
+            .github/workflows/signed-apk.yml
+            scripts/prepare-development-signing.py
+            tests/development-signing.test.py
+          sparse-checkout-cone-mode: false
+      - name: Test one-time guard without secrets
+        run: python3 guard/tests/development-signing.test.py
+      - name: Validate successful source run and acquire exact pinned unsigned artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 guard/scripts/prepare-development-signing.py "$RUNNER_TEMP/nova-development-input"
+      - name: Checkout trusted production signer, never development signing scripts
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: beaf5c7557b153f7e2b7ca3c7907a8b26a88890b
+          persist-credentials: false
+          path: trusted
+          sparse-checkout: scripts
+      - name: Install signing tool build dependencies before loading secrets
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends build-essential meson ninja-build pkg-config libssl-dev zlib1g-dev libzstd-dev
+      - name: Build trusted pinned and checksummed APK tool without signing secret
+        run: bash trusted/scripts/build-host-apk.sh "$RUNNER_TEMP/nova-host-apk"
+      - name: Sign exact development pair and strictly verify existing trust
+        shell: bash
+        env:
+          NOVA_APK_SIGNING_KEY: ${{ secrets.NOVA_APK_SIGNING_KEY }}
+          # Existing 0.2.1 publisher key, independently verified from installed trust.
+          NOVA_APK_SIGNING_PUBLIC_KEY_SHA256: 1475de2470b41a6c99263996ebc44b393bdf385d3639991514563d5c89054140
+        run: |
+          set +x
+          set -euo pipefail
+          bash trusted/scripts/sign-release-apks.sh "$RUNNER_TEMP/nova-host-apk/build/src/apk" \
+            "$RUNNER_TEMP/nova-development-input/luci-theme-nova-0.2.3-r1.apk" \
+            "$RUNNER_TEMP/nova-development-input/luci-app-nova-dashboard-0.2.3-r1.apk" \
+            "$RUNNER_TEMP/nova-development-signed"
+      - name: Add development provenance and checksum it
+        run: |
+          cp "$RUNNER_TEMP/nova-development-input/BUILD-SOURCE.json" "$RUNNER_TEMP/nova-development-signed/BUILD-SOURCE.json"
+          cd "$RUNNER_TEMP/nova-development-signed"
+          sha256sum BUILD-SOURCE.json PUBLIC-KEY-SHA256.txt >> SHA256SUMS
+      - name: Upload DEVELOPMENT-TEST packages and public material only
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: DEVELOPMENT-TEST-luci-nova-0.2.3-r1-a0ce5dd2b474
+          path: |
+            ${{ runner.temp }}/nova-development-signed/luci-theme-nova-0.2.3-r1.apk
+            ${{ runner.temp }}/nova-development-signed/luci-app-nova-dashboard-0.2.3-r1.apk
+            ${{ runner.temp }}/nova-development-signed/nova-signing-public.pem
+            ${{ runner.temp }}/nova-development-signed/PUBLIC-KEY-SHA256.txt
+            ${{ runner.temp }}/nova-development-signed/SHA256SUMS
+            ${{ runner.temp }}/nova-development-signed/BUILD-SOURCE.json
+          if-no-files-found: error
+          retention-days: 7
