@@ -175,7 +175,8 @@ input:disabled,select:disabled,textarea:disabled,.cbi-dropdown[disabled]:not(.bt
  opacity:.62;cursor:not-allowed;box-shadow:none!important;border-color:var(--nova-border)!important
 }
 @media(forced-colors:active){
- input:focus-visible,select:focus-visible,textarea:focus-visible,.cbi-dropdown:focus-visible,.cbi-dropdown:focus-within{
+ :root input:focus-visible,:root select:focus-visible,:root textarea:focus-visible,
+ .cbi-dropdown:not(.btn):not(.cbi-button):focus-visible,.cbi-dropdown:not(.btn):not(.cbi-button):focus-within{
   outline:2px solid Highlight!important;outline-offset:2px;box-shadow:none!important;border-color:Highlight!important}
 }
 .btn.primary:hover,.cbi-button-positive:hover,.cbi-button-apply:hover{background:var(--nova-accent-hover)!important}

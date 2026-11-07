@@ -104,8 +104,10 @@ test('Quiet Slate visual hierarchy, accessible contrast and responsive containme
     assert.equal(states.invalidBorder,'rgb(232, 160, 160)');assert.match(states.invalidShadow,/232, 160, 160/);assert.equal(states.invalidOutline,'none');assert.ok(states.errorVisible);
     assert.equal(states.disabledShadow,'none');assert.equal(states.disabledCursor,'not-allowed');assert.ok(states.disabled&&states.readonly);
     await send('Emulation.setEmulatedMedia',{features:[{name:'forced-colors',value:'active'}]});
-    const highContrast=await evaluate("(()=>{const e=document.querySelector('#host');e.focus();const s=getComputedStyle(e);return {outline:s.outlineStyle,width:s.outlineWidth};})()");
-    assert.equal(highContrast.outline,'solid');assert.equal(highContrast.width,'2px');
+    for(const selector of ['#host','#zone','#notes','#custom-dropdown']){
+     const highContrast=await evaluate(`(()=>{const e=document.querySelector('${selector}');e.focus();const s=getComputedStyle(e);return {outline:s.outlineStyle,width:s.outlineWidth};})()`);
+     assert.equal(highContrast.outline,'solid',selector+' forced-colors focus');assert.equal(highContrast.width,'2px');
+    }
     await send('Emulation.setEmulatedMedia',{features:[]});
     await evaluate("document.querySelector('#host').focus()");
     console.log(`${width}/native: soft focus, error/disabled/readonly states, forced colors, roomy tabs`);
