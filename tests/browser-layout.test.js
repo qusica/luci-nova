@@ -34,9 +34,9 @@ ${['概览','路由表','防火墙','内核日志','进程','实时信息'].map(
 (async function(){
 const scenario=new URLSearchParams(location.search).get('case') || 'empty';
 try {
-    const svgTags=['svg','line','polyline'];
     function E(tag,attrs={},children=[]) {
-        const e=svgTags.includes(tag)?document.createElementNS('http://www.w3.org/2000/svg',tag):document.createElement(tag);
+        // LuCI dom.create does not infer an SVG namespace.
+        const e=document.createElement(tag);
         for(const [name,value] of Object.entries(attrs)) {
             if(typeof value==='function')e.addEventListener(name,value);
             else if(typeof value==='boolean'){if(value)e.setAttribute(name,'');}
@@ -71,7 +71,7 @@ try {
         {url:x=>'/cgi-bin/luci/'+x,resource:x=>${JSON.stringify(dashboardUrl)}},document);
     const data=await app.load();
     const stylesheet=document.getElementById('nova-dashboard-style');
-    const expectedHref=${JSON.stringify(dashboardUrl)}+'?v=0.2.5';
+    const expectedHref=${JSON.stringify(dashboardUrl)}+'?v=0.2.9';
     const styleLoaded=new Promise((resolve,reject)=>{
         function loaded(){
             if(stylesheet.getAttribute('href')===expectedHref && stylesheet.sheet && stylesheet.sheet.href===expectedHref){
@@ -84,8 +84,11 @@ try {
     document.getElementById('maincontent').append(app.render(data));
     await styleLoaded;
     function check(condition,message){if(!condition)throw new Error(message);}
-    check(stylesheet.getAttribute('href')===${JSON.stringify(dashboardUrl)}+'?v=0.2.5','stale CSS link was not upgraded');
+    check(stylesheet.getAttribute('href')===${JSON.stringify(dashboardUrl)}+'?v=0.2.9','stale CSS link was not upgraded');
     check(!/null|undefined/.test(document.querySelector('.nova-dashboard').textContent),'conditional DOM entries leaked literal null/undefined');
+    const vectorNodes=[...document.querySelectorAll('.nova-dashboard svg,.nova-dashboard svg *')];
+    check(vectorNodes.length>0 && vectorNodes.every(n=>n.namespaceURI==='http://www.w3.org/2000/svg'),'SVG must use native SVG namespace, not a fixture repair');
+    check([...document.querySelectorAll('.nv-icon')].every(n=>n.viewBox.baseVal.width===24 && n.getBBox().width>0 && n.getBBox().height>0),'decorative SVG has no rendered geometry');
     const width=window.innerWidth;
     const expected=scenario==='dual'||scenario==='configured'?6:scenario==='disabled'?5:scenario==='pppoe'?4:3;
     const grid=getComputedStyle(document.querySelector('.nv-metric-grid'));

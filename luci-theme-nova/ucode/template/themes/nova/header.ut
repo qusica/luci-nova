@@ -32,9 +32,9 @@
 		<meta name="viewport" content="width=device-width, initial-scale=1">
 		<meta name="darkreader-lock">
 		<link rel="stylesheet" href="/luci-static/bootstrap/cascade.css">
+		<link rel="stylesheet" media="only screen and (max-device-width: 854px)" href="/luci-static/bootstrap/mobile.css" />
 		<link rel="stylesheet" href="{{ media }}/cascade.css">
 		<link rel="stylesheet" href="{{ media }}/nova-lists.css">
-		<link rel="stylesheet" media="only screen and (max-device-width: 854px)" href="/luci-static/bootstrap/mobile.css" />
 		
 		<link rel="icon" href="{{ media }}/logo.svg" sizes="any">
 		{% if (dispatched?.css): %}

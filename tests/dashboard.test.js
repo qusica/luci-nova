@@ -22,7 +22,7 @@ function harness() {
     let active;
     function E(tag, attrs = {}, children = []) {
         const element = {
-            tag, attrs, hidden: !!attrs.hidden, parent: null, children: [],
+            tag, attrs, namespaceURI: 'http://www.w3.org/1999/xhtml', hidden: !!attrs.hidden, parent: null, children: [],
             get isConnected() { return this.tag === 'body' || this.tag === 'head' || !!(this.parent && this.parent.isConnected); },
             get nextSibling() { return this.parent && this.parent.children[this.parent.children.indexOf(this)+1]; },
             get textContent() { return text(this); },
@@ -59,7 +59,13 @@ function harness() {
     const document = {
         head: E('head'), body: E('body'),
         getElementById: id => all(document.body, n => n.attrs.id === id).concat(all(document.head, n => n.attrs.id === id))[0],
-        createTextNode: text => String(text)
+        createTextNode: text => String(text),
+        createElementNS: (namespace, tag) => {
+            assert.equal(namespace, 'http://www.w3.org/2000/svg');
+            const element = E(tag);
+            element.namespaceURI = namespace;
+            return element;
+        }
     };
     const responses = {
         'system.board': { hostname:'test-router', model:'Test router', release:{description:'OpenWrt test'} },
@@ -373,11 +379,52 @@ test('read-only ACL covers strict inventories and no router configuration writes
 
 test('versioned stylesheet is upgraded once; render and remove maintain one poll',async()=>{
     const app=harness();await app.render();assert.equal(app.polls.size,1);
-    const style=app.document.head.children[0];assert.equal(style.attrs.href,'/luci-static/resources/nova/dashboard.css?v=0.2.5');
+    const style=app.document.head.children[0];assert.equal(style.attrs.href,'/luci-static/resources/nova/dashboard.css?v=0.2.9');
     assert.ok(fs.statSync(path.join(resources,'nova/dashboard.css')).size>0);
     for(const old of ['','?v=0.2.2']){
         app.view.remove();style.attrs.href='/luci-static/resources/nova/dashboard.css'+old;
-        await app.render();assert.equal(app.document.head.children.length,1);assert.match(style.attrs.href,/\?v=0\.2\.5$/);assert.equal(app.polls.size,1);
+        await app.render();assert.equal(app.document.head.children.length,1);assert.match(style.attrs.href,/\?v=0\.2\.9$/);assert.equal(app.polls.size,1);
     }
     app.view.remove();assert.equal(app.polls.size,0);
+});
+
+test('dashboard icons are decorative semantic SVGs, never health checkmarks', async () => {
+    const app = harness();
+    await app.render();
+    const metrics = all(app.root, hasClass('nv-metric'));
+    assert.equal(metrics.length, 3);
+    const icons = all(app.root, hasClass('nv-icon'));
+    assert.ok(icons.length >= 5);
+    for (const icon of icons) {
+        assert.equal(icon.tag, 'svg');
+        assert.equal(icon.namespaceURI, 'http://www.w3.org/2000/svg');
+        assert.ok(icon.children.every(child => child.namespaceURI === icon.namespaceURI));
+        assert.equal(icon.attrs['aria-hidden'], 'true');
+        assert.equal(icon.attrs.focusable, 'false');
+        assert.equal(icon.attrs.viewBox, '0 0 24 24');
+        assert.equal(text(icon), '');
+    }
+    const metricIcons = metrics.map(metric => all(metric, hasClass('nv-icon'))[0]);
+    assert.equal(new Set(metricIcons.map(icon => JSON.stringify(icon.children.map(child => child.attrs.points)))).size, 3);
+    assert.ok(!text(app.root).includes('✓'));
+});
+
+
+test('LuCI-faithful DOM creates all chart roots and shapes in SVG namespace', async () => {
+    const app = harness();
+    await app.render([wanUp], {radio0:radio('2g')});
+    const charts = all(app.root, node => node.tag === 'svg' && !hasClass('nv-icon')(node));
+    assert.equal(charts.length, 2, 'WAN and Wi-Fi chart retained');
+    for (const chart of charts) {
+        assert.equal(chart.namespaceURI, 'http://www.w3.org/2000/svg');
+        assert.ok(chart.attrs.viewBox, 'case-sensitive viewBox preserved');
+        assert.equal(chart.attrs.preserveAspectRatio, 'none');
+        assert.ok(chart.children.length > 0);
+        for (const shape of chart.children) {
+            assert.equal(shape.namespaceURI, chart.namespaceURI);
+            assert.ok(['line','polyline'].includes(shape.tag));
+        }
+    }
+    await [...app.polls][0]();
+    assert.notEqual(all(app.root, n => n.attrs['data-nova'] === 'down-path')[0].attrs.points, '0,145 600,145');
 });

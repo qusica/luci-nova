@@ -2,7 +2,7 @@
 
 Nova is a dark LuCI theme and a companion status dashboard for OpenWrt and ImmortalWrt.
 
-> Preview 0.2.5: detected interface cards, live PPPoE status and searchable native LuCI lists. This is still experimental and has not been tested on every router or firmware. Keep Bootstrap installed for safe rollback.
+> Preview 0.2.9: detected interface cards, live PPPoE status and searchable native LuCI lists. This is still experimental and has not been tested on every router or firmware. Keep Bootstrap installed for safe rollback.
 
 ## Packages
 
@@ -98,7 +98,14 @@ Chrome or Chromium (the GitHub runner includes `google-chrome`):
 CHROME_BIN=google-chrome node --test tests/browser-layout.test.js
 CHROME_BIN=google-chrome node --test tests/navigation-browser.test.js
 CHROME_BIN=google-chrome node --test tests/native-lists-browser.test.js
+CHROME_BIN=google-chrome node --test tests/visual-browser.test.js
 ```
+
+When running all four browser files together, pass `--test-concurrency=1` to Node.
+Each suite launches its own Chrome process; serial startup avoids resource
+contention on small runners without weakening assertions or timeouts.
+CI and extracted-APK checks also create a writable, run-local Fontconfig cache
+and warm it before Chrome starts; cache failures remain test failures.
 
 The browser test uses local fixtures only. It starts with a stale stylesheet link,
 loads the current versioned CSS, and checks the actual Nova styles. It does not
@@ -123,6 +130,46 @@ rejects that mistake. To run the same comparison locally, set
 ## License
 
 Project-authored files: MIT. Templates adapted from the LuCI Bootstrap theme retain their upstream Apache-2.0 notices.
+
+## What's new in 0.2.9
+
+- Normalize native map, heading, description, section and form spacing across
+  system, status and network pages. Inactive native tab panels no longer leave
+  padded empty strips, and clock action buttons have their own wrapping row.
+- Load Bootstrap mobile before Nova so the same spacing rules win on phones.
+  Preserve native joined widgets, dependency visibility and tab behavior.
+- Add a faithful native Bootstrap fixture with true device-width tests, repeated
+  tab changes, nested sections, action groups and modal containment. Source and
+  extracted APK checks run the same suite.
+
+## What's new in 0.2.8
+
+- Give text inputs, selects, textareas and native dropdowns a gentle focus glow
+  rather than a detached outline. Invalid fields retain red borders and glow;
+  disabled fields remain quiet. Forced-colors mode keeps a system focus outline.
+- Make native tab targets 38 px high (40 px on narrow screens) with more padding
+  and gaps, preserving native tab behavior and keyboard access.
+
+- Preserve CSS bytes through packaging. The SDK's csstidy optimizer was observed
+  replacing muted-label declarations with an unrelated radio-meter background.
+- Verify every packaged stylesheet against source, plus exact small-label color,
+  transparency and size in the source and packaged visual browser suites.
+- JavaScript remains minified. APK compression still keeps the package compact.
+
+## What's new in 0.2.7
+
+- Fix an actual native-LuCI rendering issue: dashboard SVG icons and charts now explicitly use the SVG namespace. LuCI's generic `E()` creates HTML elements even when the tag is `svg`, so that helper cannot create working vectors.
+- Browser fixtures now reproduce LuCI's actual HTML-only `E()` behavior. Regression checks verify SVG namespace, case-sensitive viewBox attributes and nonempty rendered icon geometry, including extracted APKs.
+- Asset versions advance again because 0.2.6 was installed during live acceptance. The Quiet Slate palette and all data/configuration behavior are unchanged.
+
+## What's new in 0.2.6
+
+- **Quiet Slate:** a unified graphite and ice-blue visual system across navigation, native LuCI forms, the dashboard, lists and the favicon. Mint indicates live activity, amber marks warnings, and lavender distinguishes uploads. No fluorescent lime accents remain.
+- Larger tabular metrics, clearer secondary labels, calmer borders and a more spacious header improve long-session readability. Consistent decorative line icons replace the misleading checkmarks previously shown beside every metric.
+- Keyboard focus remains visible. Download/upload charts also differ by line pattern, not color alone. Existing detected-interface data, native actions, menu interactions, list search and pagination are unchanged.
+- A dedicated secret-free visual review checks 320/390/768/1024/1440 px layouts, key small-text contrast, unknown-state cards and decorative SVG accessibility. Screenshots use **synthetic test data**, not router telemetry. The same browser test is run against the minified APK assets.
+
+See [visual design notes](docs/visual-design.md) for palette, semantics and acceptance boundaries.
 
 ## What's new in 0.2.5
 
@@ -169,7 +216,7 @@ Detection uses strict `network.interface dump` and `network.wireless status` rea
 
 ### Updating an existing installation
 
-Make sure to download the fresh 0.2.3 packages from a **successful** CI run.
+Make sure to download the fresh 0.2.9 packages from a **successful** CI run.
 Install both packages again using your device's normal package-manager update/upgrade procedure,
 and reload the browser without cached assets. SSH rollback remains available above.
 
