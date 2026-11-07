@@ -32,6 +32,7 @@ ${['概览','路由表','防火墙','内核日志','进程','实时信息'].map(
 <div class="nova-topbar">Local fixture</div><div id="maincontent" class="container"></div>
 <script>
 (async function(){
+const scenario=new URLSearchParams(location.search).get('case') || 'empty';
 try {
     const svgTags=['svg','line','polyline'];
     function E(tag,attrs={},children=[]) {
@@ -41,31 +42,83 @@ try {
             else if(typeof value==='boolean'){if(value)e.setAttribute(name,'');}
             else e.setAttribute(name,value);
         }
-        for(const child of Array.isArray(children)?children:[children])if(child!=null)e.append(child);
+        // Match LuCI 25.12 dom.append: null inside an array becomes text.
+        for(const child of Array.isArray(children)?children:[children])e.append(child);
         return e;
     }
-    const app=new Function('view','rpc','poll','network','fs','E','L','document',${JSON.stringify(source)})(
-        {extend:x=>x},{declare:()=>()=>Promise.resolve({})},{add:()=>{},remove:()=>{}},{},{},E,
+    const lan={interface:'lan',up:true,device:'br-home'};
+    const ppp={interface:'internet',proto:'pppoe',up:false,device:'eth1'};
+    const wifi=(band,frequency,channel)=>({up:true,disabled:false,config:{band},interfaces:[{
+        section:'default_'+band,ifname:'phy-'+band,config:{ssid:'Test '+band},iwinfo:{frequency,channel,ssid:'Test '+band}
+    }]});
+    let interfaces=scenario==='lan'?[lan]:scenario==='pppoe'?[ppp]:scenario==='dual'?[{...ppp,up:true,l3_device:'pppoe-internet'},lan]:[];
+    const wireless=scenario==='dual'?{radio0:wifi('2g',2462,11),radio1:wifi('5g',5180,36),radio2:wifi('6g',5955,1)}:
+        scenario==='disabled'?{radio1:{up:false,disabled:true,config:{band:'5g'},interfaces:[]}}:{};
+    const polls=new Set(),samples=[];
+    let runtimeFailed=scenario==='failed'||scenario==='configured';
+    const app=new Function('view','rpc','poll','fs','E','L','document',${JSON.stringify(source)})(
+        {extend:x=>x},{declare:options=>(...args)=>{
+            const key=options.object+'.'+options.method;
+            if(runtimeFailed&&(key==='network.interface.dump'||key==='network.wireless.status'))return Promise.reject(new Error('RPC call failed with ubus code 4: 未找到'));
+            if(key==='uci.get')return Promise.resolve(scenario==='configured'?{values:args[0]==='network'?{
+                lan:{'.type':'interface',device:'br-home',proto:'static'},internet:{'.type':'interface',device:'eth1',proto:'pppoe',password:'private-never-render'}
+            }:{radio0:{'.type':'wifi-device',band:'5g',disabled:'1'}}}:{});
+            if(key==='luci.getRealtimeStats')samples.push(args);
+            return Promise.resolve(key==='system.board'?{hostname:'local-fixture',release:{description:'OpenWrt fixture'}}:
+                key==='network.interface.dump'?{interface:interfaces}:key==='network.wireless.status'||key==='luci-rpc.getWirelessDevices'?structuredClone(wireless):
+                key==='iwinfo.assoclist'?{results:[]}:key==='luci.getRealtimeStats'?[[1,100,0,50],[4,400,0,200]]:{});
+        }},{add:fn=>polls.add(fn),remove:fn=>polls.delete(fn)},{read:()=>Promise.resolve(null)},E,
         {url:x=>'/cgi-bin/luci/'+x,resource:x=>${JSON.stringify(dashboardUrl)}},document);
+    const data=await app.load();
     const stylesheet=document.getElementById('nova-dashboard-style');
+    const expectedHref=${JSON.stringify(dashboardUrl)}+'?v=0.2.5';
     const styleLoaded=new Promise((resolve,reject)=>{
-        stylesheet.addEventListener('load',resolve,{once:true});
+        function loaded(){
+            if(stylesheet.getAttribute('href')===expectedHref && stylesheet.sheet && stylesheet.sheet.href===expectedHref){
+                stylesheet.removeEventListener('load',loaded);resolve();
+            }
+        }
+        stylesheet.addEventListener('load',loaded);
         stylesheet.addEventListener('error',()=>reject(new Error('versioned dashboard CSS failed to load')),{once:true});
     });
-    document.getElementById('maincontent').append(app.render([
-        {hostname:'local-fixture',release:{description:'OpenWrt fixture'}},{},{interface:[]},[],{},null,null,[]
-    ]));
+    document.getElementById('maincontent').append(app.render(data));
     await styleLoaded;
     function check(condition,message){if(!condition)throw new Error(message);}
-    check(stylesheet.getAttribute('href')===${JSON.stringify(dashboardUrl)}+'?v=0.2.2','stale CSS link was not upgraded');
+    check(stylesheet.getAttribute('href')===${JSON.stringify(dashboardUrl)}+'?v=0.2.5','stale CSS link was not upgraded');
+    check(!/null|undefined/.test(document.querySelector('.nova-dashboard').textContent),'conditional DOM entries leaked literal null/undefined');
     const width=window.innerWidth;
-    const expected=width>1350?6:width>780?3:width>530?2:1;
+    const expected=scenario==='dual'||scenario==='configured'?6:scenario==='disabled'?5:scenario==='pppoe'?4:3;
     const grid=getComputedStyle(document.querySelector('.nv-metric-grid'));
     check(grid.display==='grid','dashboard metric layout is not grid');
-    check(grid.gridTemplateColumns.split(' ').length===expected,'wrong dashboard column count at '+width);
+    const columns=grid.gridTemplateColumns.split(' ').filter(v=>parseFloat(v)>0).length;
+    check(columns>=1 && columns<=expected,'wrong visible metric column count at '+width);
+    if(width<=530)check(columns===1,'mobile metric layout must be one column');
+    check(document.querySelectorAll('.nv-metric').length===expected,'missing-interface fixture retains fake interface metrics');
+    if(scenario==='empty'||scenario==='failed')check(!document.querySelector('.nv-wifi,.nv-internet,.nv-traffic,.nv-wireline,.nv-fork,.nv-radio'),'empty inventory retains fake topology/card');
+    if(scenario==='lan')check(!document.querySelector('.nv-wifi,.nv-internet,.nv-traffic,.nv-wireline'),'LAN-only inventory has phantom WAN or wireless');
+    if(scenario==='disabled'){
+        check(document.querySelectorAll('.nv-wifi').length===1,'disabled radio card lost');
+        check(document.querySelector('.nv-wifi').textContent.includes('已禁用'),'disabled radio status missing');
+        check(!document.querySelector('.nv-internet,.nv-traffic'),'disabled-only fixture adds a WAN');
+    }
+    if(scenario==='failed'||scenario==='configured')check(document.querySelector('.nv-detection-warning'),'detection error is hidden');
+    if(scenario==='configured'){
+        check(document.querySelectorAll('.nv-wifi').length===1,'configured radio lost');
+        check(document.querySelector('.nv-wifi').textContent.includes('已禁用（配置）'),'configured disabled state lost');
+        check(document.querySelector('.nv-internet').textContent.includes('状态未知'),'configured PPPoE claims runtime state');
+        check(!document.querySelector('.nova-dashboard').textContent.includes('private-never-render'),'configuration secret rendered');
+        await [...polls][0]();check(samples.length===0,'unavailable runtime sampled traffic');
+    }
+    const branches=document.querySelectorAll('.nv-radio');
+    const clients=document.querySelectorAll('.nv-client');
+    check(branches.length===clients.length,'branch/client rows differ');
+    for(let i=0;i<branches.length;i++)check(Math.abs(branches[i].getBoundingClientRect().top-clients[i].getBoundingClientRect().top)<1,'dynamic branch row misaligned');
+    if(scenario==='dual')check(document.querySelectorAll('.nv-wifi').length===3,'2.4/5/6 GHz cards missing');
+    const topology=document.querySelector('.nv-path');
+    if(scenario==='empty')check(topology.scrollWidth<=topology.clientWidth+1,'empty topology leaves phantom columns');
     check(getComputedStyle(document.querySelector('.nv-overview-head')).display==='flex','dashboard header is not flex');
     const router=document.querySelector('.nv-router');
-    check(router.title==='OpenWrt fixture · 未检测到 LAN 接口','missing LAN tooltip');
+    check(router.title==='OpenWrt fixture · '+(scenario==='configured'?'LAN br-home（已配置，运行状态未知）':scenario==='lan'||scenario==='dual'?'LAN br-home':scenario==='failed'?'接口检测失败':'未检测到 LAN 接口'),'LAN tooltip');
     router.click();router.click();
     check(document.querySelectorAll('#nv-selected a').length===1,'repeated node clicks duplicated detail');
     const header=document.querySelector('header');
@@ -80,18 +133,39 @@ try {
     }else{
         check(getComputedStyle(header).overflowY==='auto','desktop sidebar must remain scrollable');
     }
-    parent.postMessage({width,passed:true,columns:expected,stylesheetUpgraded:true},'*');
-}catch(error){parent.postMessage({width:innerWidth,passed:false,error:error.message},'*');}
+    if(scenario==='configured'){
+        runtimeFailed=false;interfaces=[{...ppp,up:true,l3_device:'pppoe-internet','ipv4-address':[{address:'203.0.113.8'}]},lan];
+        await [...polls][0]();
+        check(!document.querySelector('.nv-detection-warning'),'runtime recovery kept stale warnings');
+        check(!document.querySelector('.nv-wifi'),'runtime recovery kept removed configured radio');
+        check(document.querySelector('.nv-internet').textContent.includes('203.0.113.8'),'runtime recovery did not update configured PPPoE');
+    }
+    if(scenario==='pppoe'){
+        router.focus();
+        interfaces=[{...ppp,up:true,l3_device:'pppoe-internet','ipv4-address':[{address:'203.0.113.8'}]}];
+        await [...polls][0]();
+        check(document.querySelector('.nv-internet').textContent.includes('203.0.113.8'),'PPPoE did not refresh');
+        check(document.activeElement.classList.contains('nv-router'),'refresh lost keyboard focus');
+        check(document.querySelector('#nv-selected').hidden===false,'refresh lost open detail');
+        check(!document.querySelector('[data-nova=traffic-down]').textContent.includes('等待'),'refresh skipped current traffic sample');
+        interfaces=[];await [...polls][0]();
+        check(!document.querySelector('.nv-internet,.nv-traffic'),'removed WAN remains visible');
+        check(polls.size===1,'refresh duplicated polling');
+    }
+    app.remove();check(polls.size===0,'teardown leaked a poll');
+    parent.postMessage({width,scenario,passed:true,columns,stylesheetUpgraded:true},'*');
+}catch(error){parent.postMessage({width:innerWidth,scenario,passed:false,error:error.message},'*');}
 })();
 </script>`;
         fs.writeFileSync(path.join(temporary, 'frame.html'), child);
         const frame = pathToFileURL(path.join(temporary, 'frame.html')).href;
         const widths = [1600, 1180, 700, 528, 390];
+        const scenarios = ['empty','lan','pppoe','dual','disabled','failed','configured'];
         fs.writeFileSync(path.join(temporary, 'index.html'), `<!doctype html><meta charset="utf-8"><pre id="results">pending</pre><script>
 const results=[];
 addEventListener('message',event=>{if(!event.data||typeof event.data.passed!=='boolean')return;results.push(event.data);
-if(results.length===${widths.length})document.getElementById('results').textContent=JSON.stringify(results);});
-for(const width of ${JSON.stringify(widths)}){const frame=document.createElement('iframe');frame.width=width;frame.height=900;frame.style.border='0';frame.src=${JSON.stringify(frame)};document.body.append(frame);}
+if(results.length===${widths.length * scenarios.length})document.getElementById('results').textContent=JSON.stringify(results);});
+for(const width of ${JSON.stringify(widths)})for(const scenario of ${JSON.stringify(scenarios)}){const frame=document.createElement('iframe');frame.width=width;frame.height=900;frame.style.border='0';frame.src=${JSON.stringify(frame)}+'?case='+scenario;document.body.append(frame);}
 </script>`);
         const run = spawnSync(process.env.CHROME_BIN || 'google-chrome', [
             '--headless', '--no-sandbox', '--disable-dev-shm-usage', '--no-first-run',
@@ -106,9 +180,9 @@ for(const width of ${JSON.stringify(widths)}){const frame=document.createElement
         assert.ok(match, 'browser did not emit fixture results');
         assert.notEqual(match[1], 'pending', 'browser did not finish all viewport fixtures');
         const results = JSON.parse(match[1]);
-        assert.deepEqual(results.map(result => result.width).sort((a,b) => a-b), widths.slice().sort((a,b) => a-b));
-        for (const result of results) assert.equal(result.passed, true, JSON.stringify(result));
+        assert.deepEqual(results.map(result => result.width+'|'+result.scenario).sort(),widths.flatMap(width=>scenarios.map(scenario=>width+'|'+scenario)).sort());
         console.log(JSON.stringify(results));
+        for (const result of results) assert.equal(result.passed, true, JSON.stringify(result));
     } finally {
         fs.rmSync(temporary, { recursive: true, force: true });
     }

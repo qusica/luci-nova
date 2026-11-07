@@ -53,26 +53,31 @@ header .brand:hover{color:#fff;text-decoration:none}
  color:#aeb3be;background:transparent;font-size:14px;font-weight:550;
  line-height:21px;text-decoration:none;box-shadow:none;white-space:normal;
 }
-#topmenu>li>a::before{content:"▦";width:22px;flex:0 0 22px;
- margin-right:9px;font-size:18px;color:#9198a4;line-height:18px}
-#topmenu>li:nth-child(2)>a::before{content:"⌁"}
-#topmenu>li:nth-child(3)>a::before{content:"⚙"}
-#topmenu>li:nth-child(4)>a::before{content:"◇"}
-#topmenu>li:nth-child(n+5)>a::before{content:"□"}
+/* SVGs avoid font-dependent glyph sizes and do not enter accessible names. */
+#topmenu>li>a::before{content:none}
+#topmenu .nova-menu-icon{display:block;width:20px;height:20px;flex:0 0 20px;
+ margin-right:10px;color:inherit;pointer-events:none}
+#topmenu>li>a.menu{padding-right:34px}
+/* Replace Bootstrap's inline triangle, which otherwise hugs the label. */
+#topmenu>li>a.menu::after{content:"";position:absolute;right:15px;top:50%;
+ width:6px;height:6px;margin:-4px 0 0;padding:0;opacity:1;
+ border:0;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;
+ text-indent:0;transform:rotate(45deg);pointer-events:none}
+#topmenu>li>a.menu[aria-expanded="true"]::after{margin-top:-1px;transform:rotate(225deg)}
 #topmenu>li.active>a,#topmenu>li>a:hover,
 #topmenu>li.dropdown.open>a,#topmenu>li.nova-search-result>a:focus{
  color:#c5ef4d;background:#252c1b;
 }
-#topmenu>li.active>a::before,#topmenu>li>a:hover::before{color:#c9f354}
 #topmenu .dropdown-menu{
  position:static!important;display:none;visibility:visible;float:none;
- width:100%;min-width:0;margin:2px 0 5px;padding:2px 0 2px 12px;
+ width:100%;min-width:0;margin:2px 0 5px;padding:2px 0;box-sizing:border-box;
  background:none;border:0;box-shadow:none;transform:none;
 }
 #topmenu>li.open>.dropdown-menu{display:block}
 #topmenu a:focus-visible{outline:2px solid #c5ef4d;outline-offset:-2px}
 #topmenu .dropdown-menu a{
- display:block;border-radius:6px;padding:7px 10px;
+ display:block;border-radius:6px;padding:7px 12px 7px 42px;
+ box-sizing:border-box;white-space:normal;overflow-wrap:anywhere;text-shadow:none;
  color:#a7adb9;background:transparent;font-size:12px;
 }
 #topmenu .dropdown-menu a:hover,#topmenu .dropdown-menu li.active>a{background:#242a1c;color:#c8f24b}
@@ -136,8 +141,11 @@ footer a{color:#a5c45f}
  #topmenu{flex-direction:row;flex-wrap:wrap;gap:3px}
  #topmenu>li{width:auto}
  #topmenu>li>a{padding:7px 10px;font-size:12px;min-height:35px}
- #topmenu>li>a::before{font-size:14px;width:16px;flex-basis:16px;margin-right:5px}
- #topmenu .dropdown-menu{position:absolute!important;top:100%;z-index:120;width:210px;
+ #topmenu .nova-menu-icon{width:18px;height:18px;flex-basis:18px;margin-right:7px}
+ #topmenu>li>a.menu{padding-right:28px}
+ #topmenu>li>a.menu::after{right:12px}
+ #topmenu .dropdown-menu a{padding:7px 10px}
+ #topmenu .dropdown-menu{position:absolute!important;top:100%;left:0;z-index:120;width:210px;
  background:#17191e;border:1px solid #2c3038;border-radius:8px;padding:5px}
  .nova-sidebar-foot{display:none}
  .nova-topbar{position:relative;inset:auto;height:auto;min-height:51px;padding:8px 12px}

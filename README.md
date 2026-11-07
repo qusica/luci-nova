@@ -2,12 +2,12 @@
 
 Nova is a dark LuCI theme and a companion status dashboard for OpenWrt and ImmortalWrt.
 
-> Preview 0.2.2: click-controlled navigation, live status metrics and versioned browser assets. This is still experimental and has not been tested on every router or firmware. Keep Bootstrap installed for safe rollback.
+> Preview 0.2.5: detected interface cards, live PPPoE status and searchable native LuCI lists. This is still experimental and has not been tested on every router or firmware. Keep Bootstrap installed for safe rollback.
 
 ## Packages
 
 - `luci-theme-nova` — dark visual theme, with Bootstrap as its supported base.
-- `luci-app-nova-dashboard` — independent LuCI dashboard under **Dashboard / 仪表盘** (also available via **Status → Nova Dashboard**).
+- `luci-app-nova-dashboard` — independent LuCI dashboard under **Nova Dashboard / Nova 仪表盘** (also available via **Status → Nova Dashboard**).
 
 ## IPK and APK builds
 
@@ -82,7 +82,7 @@ The output suffix (`.ipk` or `.apk`) is decided by the SDK. Prefer official vers
 Run the dependency-free dashboard rendering tests with Node.js 18 or newer:
 
 ```sh
-node --test tests/dashboard.test.js
+node --test tests/dashboard.test.js tests/native-lists.test.js tests/navigation.test.js tests/menu-localization.test.js
 node --test tests/asset-version.test.js
 node --check luci-app-nova-dashboard/htdocs/luci-static/resources/view/nova/dashboard.js
 node --check luci-theme-nova/htdocs/luci-static/nova/nova-shell.js
@@ -97,6 +97,7 @@ Chrome or Chromium (the GitHub runner includes `google-chrome`):
 ```sh
 CHROME_BIN=google-chrome node --test tests/browser-layout.test.js
 CHROME_BIN=google-chrome node --test tests/navigation-browser.test.js
+CHROME_BIN=google-chrome node --test tests/native-lists-browser.test.js
 ```
 
 The browser test uses local fixtures only. It starts with a stale stylesheet link,
@@ -122,6 +123,25 @@ rejects that mistake. To run the same comparison locally, set
 ## License
 
 Project-authored files: MIT. Templates adapted from the LuCI Bootstrap theme retain their upstream Apache-2.0 notices.
+
+## What's new in 0.2.5
+
+- Consistent line icons identify menu categories by their LuCI route, so translating, hiding or reordering categories cannot change their meaning. Dashboard uses tiles, Status uses an activity trace, System uses a gear, Network uses a connected topology, and Logout uses an exit arrow.
+- Parent and submenu labels share a text column. Disclosure arrows sit at the right edge, and tablet keyboard/touch dropdowns no longer inherit Bootstrap's offscreen position.
+- Nova's two menu entries use the native LuCI translation catalog. Simplified Chinese shows **Nova 仪表盘**, while English keeps **Nova Dashboard**. The catalog is bundled into the dashboard APK; other apps retain their own translations. See [menu localization](docs/menu-localization.md).
+
+## What's new in 0.2.3
+
+- Native overview DHCP leases keep separate IPv4/IPv6 groups; associated stations and realtime connection lists gain default-collapsed, searchable, paginated details. Every original row and native action remains available, including multiple IPv6 addresses, reservation/disconnect controls, and permission-dependent fields. Group counts describe records, not guaranteed online devices.
+- Existing system, memory, all storage mount rows, network, port, DSL and wireless summaries are left intact. Unknown add-on sections remain unchanged. See [the native overview compatibility inventory](docs/native-overview.md).
+
+- WAN and Wi-Fi nodes, matching branches, counters and charts are derived from successful OpenWrt interface/wireless status reads. No fixed 2.4/5 GHz or WAN placeholder cards remain on devices without those configurations.
+- Configured PPPoE interfaces keep their logical name and protocol while disconnected or dialing, including custom names. After dialing, their runtime device, IPv4/IPv6 addresses and throughput update automatically. IPv4 and IPv6 default routes are recognized. Native Network → Interfaces settings and all router configuration are unchanged.
+- Disabled/down radios remain visible, including radios with no active SSID. Only observed bands get cards, including 6 GHz and an explicit unknown-band group. Configured-but-missing hardware is not silently treated as removed.
+- Detection errors show a warning and retain the last known inventory, rather than claiming there are no interfaces. Initial loading uses LuCI's loading state. Failed association reads display unavailable counts, not zero clients.
+- CPU, memory, storage and native LuCI features remain available on a LAN-only device. This remains a status dashboard, not a replacement for the native configuration pages.
+
+Detection uses strict `network.interface dump` and `network.wireless status` reads. `luci-rpc.getWirelessDevices` only enriches successful wireless inventory with optional iwinfo data, because some rpcd versions mask an underlying timeout as an empty result. Netifd reports configured radios, not a guaranteed physical-hardware inventory; disabled or configured-but-unavailable devices stay visible. An arbitrary disconnected custom-named DHCP interface cannot be conclusively classified as WAN from a dump alone; connected default-route interfaces and PPPoE are recognized without relying on a fixed device name.
 
 ## What's new in 0.2.2
 
@@ -149,7 +169,7 @@ Project-authored files: MIT. Templates adapted from the LuCI Bootstrap theme ret
 
 ### Updating an existing installation
 
-Make sure to download the fresh 0.2.2 packages from a **successful** CI run.
+Make sure to download the fresh 0.2.3 packages from a **successful** CI run.
 Install both packages again using your device's normal package-manager update/upgrade procedure,
 and reload the browser without cached assets. SSH rollback remains available above.
 

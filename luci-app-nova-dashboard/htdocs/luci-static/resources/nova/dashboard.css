@@ -13,7 +13,7 @@
  background:#17191e;border:1px solid var(--nv-line);padding:7px 11px;border-radius:16px}
 .nova-dashboard .nv-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--nv-aqua);
  box-shadow:0 0 0 3px rgba(31,198,170,.13)}
-.nova-dashboard .nv-metric-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;margin-bottom:15px}
+.nova-dashboard .nv-metric-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:15px}
 .nova-dashboard .nv-metric{min-height:95px;min-width:0;display:flex;gap:11px;align-items:flex-start;
  padding:13px 12px;border:1px solid var(--nv-line);border-radius:8px;background:var(--nv-bg)}
 .nova-dashboard .nv-metric-icon{display:grid;place-items:center;flex:none;
@@ -68,7 +68,7 @@
 .nova-dashboard .nv-path-channels .nv-node-icon{width:25px;height:25px;font-size:14px;background:#1b222c;color:#79aeec}
 .nova-dashboard .nv-path-channels .nv-node.nv-five .nv-node-icon{background:#33231e;color:#fa9958}
 .nova-dashboard .nv-path-clients .nv-node-icon{background:#252830;font-size:14px;width:24px;height:24px}
-.nova-dashboard .nv-branch-lines{display:flex;flex-direction:column;gap:10px;height:215px;justify-content:center}
+.nova-dashboard .nv-branch-lines{display:flex;flex-direction:column;gap:10px;justify-content:center}
 .nova-dashboard .nv-branch-lines span{height:65px;position:relative}
 .nova-dashboard .nv-branch-lines span:after{content:'';position:absolute;left:0;right:0;top:50%;
  border-top:1px solid #5d683f}
@@ -84,7 +84,7 @@
 .nova-dashboard .nv-path-stats>div:last-child{border:0}
 .nova-dashboard .nv-path-stats strong{font-size:20px;line-height:1.2;color:#e8ebef;overflow:hidden;text-overflow:ellipsis}
 .nova-dashboard .nv-path-stats small{font-size:11px;color:#999fab}
-.nova-dashboard .nv-bottom-grid{display:grid;grid-template-columns:2.1fr 1fr 1fr;gap:14px;align-items:stretch}
+.nova-dashboard .nv-bottom-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;align-items:stretch}
 .nova-dashboard .nv-bottom-grid .nv-panel{min-height:330px}
 .nova-dashboard .nv-legend{display:flex;align-items:center;gap:13px;color:#a2a8b4;font-size:11px}
 .nova-dashboard .nv-legend span:before{content:'';display:inline-block;width:12px;height:3px;
@@ -133,12 +133,12 @@
 .nova-dashboard .nv-orange .nv-spark{stroke:#e57d43}
 .nova-dashboard .nv-mini-rate{position:absolute;right:5px;top:4px;color:#99a0aa;font-size:10px}
 @media(max-width:1350px){
- .nova-dashboard .nv-metric-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
- .nova-dashboard .nv-bottom-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .nova-dashboard .nv-metric-grid{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+ .nova-dashboard .nv-bottom-grid{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
  .nova-dashboard .nv-traffic{grid-column:1/-1}
 }
 @media(max-width:780px){
- .nova-dashboard .nv-metric-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .nova-dashboard .nv-metric-grid{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
  .nova-dashboard .nv-path-stats{grid-template-columns:repeat(2,1fr);gap:14px}
  .nova-dashboard .nv-path-stats>div:nth-child(2){border-right:0}
  .nova-dashboard .nv-traffic-content{grid-template-columns:1fr}
@@ -152,3 +152,14 @@
  .nova-dashboard .nv-traffic{grid-column:auto}
  .nova-dashboard .nv-panel-head{padding:14px}
 }
+
+/* Empty inventories collapse the entire branch, rather than leaving ghost ports. */
+.nova-dashboard .nv-path.nv-no-wan{min-width:650px;grid-template-columns:35% 6% 26% 4% 29%}
+.nova-dashboard .nv-path.nv-no-branches{min-width:500px;grid-template-columns:35% 20% 45%}
+.nova-dashboard .nv-path.nv-no-wan.nv-no-branches{min-width:0;grid-template-columns:minmax(0,360px);justify-content:center;min-height:150px}
+.nova-dashboard .nv-path-stats{grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px}
+.nova-dashboard .nv-fork[style="height:0px"]:after{display:none}
+.nova-dashboard .nv-pulse.nv-inactive,.nova-dashboard .nv-online.nv-inactive .nv-dot{background:#939ba7;box-shadow:none}
+.nova-dashboard .nv-wireline.nv-inactive{background:#69717d}
+.nova-dashboard .nv-wireline.nv-inactive:before,.nova-dashboard .nv-wireline.nv-inactive:after{background:#69717d}
+.nova-dashboard .nv-detection-warning{padding:10px 14px;border:1px solid #756339;border-radius:7px;color:#e4c278;background:#29251d;font-size:12px}
