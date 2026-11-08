@@ -19,7 +19,7 @@ jobs:
         env:
           NOVA_ASSET_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: |
-          node --test tests/dashboard.test.js tests/native-lists.test.js tests/navigation.test.js tests/menu-localization.test.js tests/asset-version.test.js
+          node --test tests/dashboard.test.js tests/native-lists.test.js tests/navigation.test.js tests/menu-localization.test.js tests/package-independence.test.js tests/asset-version.test.js
       - name: Review responsive design and interactions
         env:
           NOVA_SCREENSHOT_DIR: ${{ runner.temp }}/nova-visual-review

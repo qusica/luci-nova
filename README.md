@@ -2,12 +2,12 @@
 
 Nova is a dark LuCI theme and a companion status dashboard for OpenWrt and ImmortalWrt.
 
-> Preview 0.2.9: detected interface cards, live PPPoE status and searchable native LuCI lists. This is still experimental and has not been tested on every router or firmware. Keep Bootstrap installed for safe rollback.
+> Preview 0.2.10: detected interface cards, live PPPoE status and searchable native LuCI lists. This is still experimental and has not been tested on every router or firmware. Keep Bootstrap installed for safe rollback.
 
 ## Packages
 
-- `luci-theme-nova` — dark visual theme, with Bootstrap as its supported base.
-- `luci-app-nova-dashboard` — independent LuCI dashboard under **Nova Dashboard / Nova 仪表盘** (also available via **Status → Nova Dashboard**).
+- `luci-theme-nova` — standalone dark visual theme, with Bootstrap as its supported base. It does not depend on the dashboard.
+- `luci-app-nova-dashboard` — optional, independent LuCI dashboard under **Nova Dashboard / Nova 仪表盘** (also available via **Status → Nova Dashboard**). It can also run with Bootstrap without installing the Nova theme.
 
 ## IPK and APK builds
 
@@ -28,18 +28,27 @@ browser resources are platform-independent; the packages are intended for the
 
 ## Install
 
-Download both packages for your firmware series from a successful GitHub Actions build (or a future release). Transfer the files to your router.
+Download the theme package for your firmware series from a successful signed build (or a future release). Download the dashboard only if you want its extra status page. Transfer only the packages you intend to install to your router.
 
 For **opkg**:
 ```sh
-opkg install /tmp/luci-theme-nova_*.ipk /tmp/luci-app-nova-dashboard_*.ipk
+opkg install /tmp/luci-theme-nova_*.ipk
+# Optional, separately:
+opkg install /tmp/luci-app-nova-dashboard_*.ipk
 ```
 
-For **apk**, once both packages are individually signed and the reviewed
+For **apk**, once the selected package is individually signed and the reviewed
 publisher key is trusted by your router:
 ```sh
-apk add /tmp/luci-theme-nova-*.apk /tmp/luci-app-nova-dashboard-*.apk
+apk add /tmp/luci-theme-nova-0.2.10-r1.apk
+# Optional, separately:
+apk add /tmp/luci-app-nova-dashboard-0.2.10-r1.apk
 ```
+
+You may install, upgrade, or remove either Nova package independently. A build
+producing both packages with the same version is not an installation dependency.
+The brand link uses LuCI's normal home entry: it opens the optional dashboard
+when that is the first accessible page, otherwise a native LuCI page.
 
 The ordinary CI APK artifacts are unsigned. LuCI upload verifies package
 signatures and will reject them. The separate **Build signed APK packages**
@@ -82,7 +91,7 @@ The output suffix (`.ipk` or `.apk`) is decided by the SDK. Prefer official vers
 Run the dependency-free dashboard rendering tests with Node.js 18 or newer:
 
 ```sh
-node --test tests/dashboard.test.js tests/native-lists.test.js tests/navigation.test.js tests/menu-localization.test.js
+node --test tests/dashboard.test.js tests/native-lists.test.js tests/navigation.test.js tests/menu-localization.test.js tests/package-independence.test.js
 node --test tests/asset-version.test.js
 node --check luci-app-nova-dashboard/htdocs/luci-static/resources/view/nova/dashboard.js
 node --check luci-theme-nova/htdocs/luci-static/nova/nova-shell.js
@@ -130,6 +139,16 @@ rejects that mistake. To run the same comparison locally, set
 ## License
 
 Project-authored files: MIT. Templates adapted from the LuCI Bootstrap theme retain their upstream Apache-2.0 notices.
+
+## What's new in 0.2.10
+
+- Make the theme brand link use native LuCI home instead of requiring the
+  optional dashboard route. Native access checks and first-page selection stay
+  in LuCI, including when the dashboard is missing or inaccessible.
+- Clarify independent package installation and upgrades. Verify actual APK
+  dependency metadata, separate installation, independent upgrades, optional
+  removal and inconsistent-checksum diagnostics in disposable package roots.
+- Retain the existing native forms, lists, navigation, dashboard and visuals.
 
 ## What's new in 0.2.9
 
@@ -216,9 +235,18 @@ Detection uses strict `network.interface dump` and `network.wireless status` rea
 
 ### Updating an existing installation
 
-Make sure to download the fresh 0.2.9 packages from a **successful** CI run.
-Install both packages again using your device's normal package-manager update/upgrade procedure,
-and reload the browser without cached assets. SSH rollback remains available above.
+Download the fresh package you want to update from a **successful signed** build.
+Use the device's normal package-manager update procedure for that package, then
+reload the browser. Updating the theme does not require updating or installing
+the dashboard, and updating the dashboard does not require updating the theme.
+Keep Bootstrap installed. SSH rollback remains available above.
+
+If APK reports a `world[...]` checksum conflict involving an unchanged package,
+do not infer a dependency or uninstall working packages. A matching local-file
+checksum pin is supported and should not block an independent upgrade. Compare
+the exact constraint with the installed package before repairing an inconsistent
+pin. See [independent installation and APK diagnostics](docs/package-independence.md).
+
 
 ### Current limitations
 

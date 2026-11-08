@@ -95,6 +95,31 @@ test('asynchronous native submenu replacement updates route icon without duplica
     assert.equal(link.children.length, 1);
 });
 
+test('theme-only native menus work without creating a dashboard entry', () => {
+    const h = harness([
+        ['Status', ['#', '/cgi-bin/luci/admin/status/overview']],
+        ['System', ['#', '/cgi-bin/luci/admin/system/system']],
+        ['Network', ['#', '/cgi-bin/luci/admin/network/network']],
+        ['Logout', ['/cgi-bin/luci/admin/logout']]
+    ]);
+    for (let i = 0; i < 3; i++) h.update();
+    assert.deepEqual(h.links().map(link => link.attrs['data-nova-icon']), ['status', 'system', 'network', 'logout']);
+    assert.deepEqual(h.links().map(link => link.textContent), ['Status', 'System', 'Network', 'Logout']);
+    assert.equal(h.menu.children.length, 4);
+});
+
+test('removing the optional dashboard leaves native routes intact', () => {
+    const h = harness([
+        ['Nova Dashboard', ['/cgi-bin/luci/admin/nova']],
+        ['Status', ['#', '/cgi-bin/luci/admin/status/overview']],
+        ['System', ['#', '/cgi-bin/luci/admin/system/system']]
+    ]);
+    h.menu.children[0].remove();
+    h.update();
+    assert.deepEqual(h.links().map(link => link.attrs['data-nova-icon']), ['status', 'system']);
+    assert.equal(h.menu.children.length, 2, 'theme must not recreate removed app navigation');
+});
+
 test('unrecognized, missing and non-path URLs use a neutral folder icon', () => {
     const h = harness([['Empty', ['#']], ['Bad', ['http://[']], ['Query only', ['/?next=/admin/system']], ['Prototype name', ['/admin/toString']]]);
     assert.deepEqual(h.links().map(link => link.attrs['data-nova-icon']), ['folder','folder','folder','folder']);
