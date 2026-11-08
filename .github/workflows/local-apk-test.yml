@@ -2,7 +2,7 @@ name: Validate and sign local development APK
 
 on:
   push:
-    branches: [ci/sign-nova-0.2.9-local-test]
+    branches: [ci/sign-nova-0.2.10-local-test]
 
 permissions:
   contents: read
@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   validate:
-    if: github.repository == 'qusica/luci-nova' && github.event_name == 'push' && github.ref == 'refs/heads/ci/sign-nova-0.2.9-local-test' && github.run_attempt == 1
+    if: github.repository == 'qusica/luci-nova' && github.event_name == 'push' && github.ref == 'refs/heads/ci/sign-nova-0.2.10-local-test' && github.run_attempt == 1
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -39,11 +39,11 @@ jobs:
       - name: Checkout exact source for packaged tests, never for signing
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: bae19af4ae15eec1e517b773a861c81bcdfa5dc6
+          ref: 403f7c3679313bb6fa701ad48bb74a8011b3151a
           persist-credentials: false
           path: source
       - name: Check source tree identity
-        run: test "$(git -C source rev-parse HEAD^{tree})" = 2876865060baa2ee6607ca8b46ee7a9ca5caa6bf
+        run: test "$(git -C source rev-parse HEAD^{tree})" = 707ba3e4a434558ed2d83d847bdbbde8169e5400
       - name: Checkout trusted pinned APK tool builder
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -63,11 +63,13 @@ jobs:
         run: |
           test -s source/tests/visual-browser.test.js
           test -s source/tests/native-spacing-browser.test.js
+          test -s source/tests/package-independence.test.js
+          test -s source/scripts/test-package-independence.sh
           grep -F '"$stage/tests/visual-browser.test.js"' source/scripts/test-built-apks.sh
           grep -F '"$stage/tests/native-spacing-browser.test.js"' source/scripts/test-built-apks.sh
           bash source/scripts/test-built-apks.sh "$RUNNER_TEMP/host-apk/build/src/apk" \
-            "$RUNNER_TEMP/local-input/luci-theme-nova-0.2.9-r1.apk" \
-            "$RUNNER_TEMP/local-input/luci-app-nova-dashboard-0.2.9-r1.apk" \
+            "$RUNNER_TEMP/local-input/luci-theme-nova-0.2.10-r1.apk" \
+            "$RUNNER_TEMP/local-input/luci-app-nova-dashboard-0.2.10-r1.apk" \
             "$RUNNER_TEMP/packaged-tests"
       - name: Verify actual packaged header keeps reviewed stylesheet order
         run: |
@@ -83,8 +85,8 @@ jobs:
         with:
           name: validated-local-input-${{ github.run_id }}
           path: |
-            ${{ runner.temp }}/local-input/luci-theme-nova-0.2.9-r1.apk
-            ${{ runner.temp }}/local-input/luci-app-nova-dashboard-0.2.9-r1.apk
+            ${{ runner.temp }}/local-input/luci-theme-nova-0.2.10-r1.apk
+            ${{ runner.temp }}/local-input/luci-app-nova-dashboard-0.2.10-r1.apk
             ${{ runner.temp }}/local-input/BUILD-SOURCE.json
           if-no-files-found: error
           retention-days: 1
@@ -92,7 +94,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: PACKAGED-VISUAL-REVIEW-nova-0.2.9-bae19af4ae15
+          name: PACKAGED-VISUAL-REVIEW-nova-0.2.10-403f7c367931
           path: ${{ runner.temp }}/packaged-visual-review/
           if-no-files-found: warn
           retention-days: 7
@@ -142,7 +144,7 @@ jobs:
           set +x
           set -euo pipefail
           bash trusted/scripts/sign-release-apks.sh "$RUNNER_TEMP/host-apk/build/src/apk" \
-            validated/luci-theme-nova-0.2.9-r1.apk validated/luci-app-nova-dashboard-0.2.9-r1.apk \
+            validated/luci-theme-nova-0.2.10-r1.apk validated/luci-app-nova-dashboard-0.2.10-r1.apk \
             "$RUNNER_TEMP/local-signed"
       - name: Include source provenance and checksums
         run: |
@@ -152,10 +154,10 @@ jobs:
       - name: Upload development test pair and public material only
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: LOCAL-DEVELOPMENT-TEST-luci-nova-0.2.9-r1-bae19af4ae15
+          name: LOCAL-DEVELOPMENT-TEST-luci-nova-0.2.10-r1-403f7c367931
           path: |
-            ${{ runner.temp }}/local-signed/luci-theme-nova-0.2.9-r1.apk
-            ${{ runner.temp }}/local-signed/luci-app-nova-dashboard-0.2.9-r1.apk
+            ${{ runner.temp }}/local-signed/luci-theme-nova-0.2.10-r1.apk
+            ${{ runner.temp }}/local-signed/luci-app-nova-dashboard-0.2.10-r1.apk
             ${{ runner.temp }}/local-signed/nova-signing-public.pem
             ${{ runner.temp }}/local-signed/PUBLIC-KEY-SHA256.txt
             ${{ runner.temp }}/local-signed/SHA256SUMS

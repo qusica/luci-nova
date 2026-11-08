@@ -12,18 +12,18 @@ import sys
 
 REPO = 'qusica/luci-nova'
 REPO_ID = 1444409206
-BRANCH = 'ci/sign-nova-0.2.9-local-test'
+BRANCH = 'ci/sign-nova-0.2.10-local-test'
 WORKFLOW = '.github/workflows/local-apk-test.yml'
-SOURCE_SHA = 'bae19af4ae15eec1e517b773a861c81bcdfa5dc6'
-SOURCE_TREE = '2876865060baa2ee6607ca8b46ee7a9ca5caa6bf'
+SOURCE_SHA = '403f7c3679313bb6fa701ad48bb74a8011b3151a'
+SOURCE_TREE = '707ba3e4a434558ed2d83d847bdbbde8169e5400'
 TRUSTED_SHA = 'beaf5c7557b153f7e2b7ca3c7907a8b26a88890b'
 KEY_SHA256 = '1475de2470b41a6c99263996ebc44b393bdf385d3639991514563d5c89054140'
-VERSION = '0.2.9-r1'
+VERSION = '0.2.10-r1'
 # Fill these only after validating the actual local output and build provenance.
-MANIFEST_SHA256 = '4ea3143d3b195b061cf87f1034888e362d5d84b1c6369a9adc95aa6d5d2dbb23'
+MANIFEST_SHA256 = '763ad9320b3d21bf2c02066e97d72abcfa79d897387d9a42795772424566c70f'
 PACKAGE_SHA256 = {
-    'luci-theme-nova-0.2.9-r1.apk': '60cdc885c15ee808ed31e63af915e487eca42e8cec55238cf8afaa3c22da66a9',
-    'luci-app-nova-dashboard-0.2.9-r1.apk': '464eba611227650af12683567b77e61e2b91437a7ff835afc9326ac84e7f4aee',
+    'luci-theme-nova-0.2.10-r1.apk': '39a2b86b93a51cb5d9f65b30794eab70a7ca28e5577d9eb14cb412f181368538',
+    'luci-app-nova-dashboard-0.2.10-r1.apk': '78ad04fc568bee821cdf247e1bc120a11786dec5d07f9f3cacd4660f319bed41',
 }
 LIMIT = 2_000_000
 

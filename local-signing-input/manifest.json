@@ -1,7 +1,7 @@
 {
   "apk_tool_version": "apk-tools 3.0.5, compiled for x86_64.",
   "build_recipe": {
-    "build_helper_sha256": "58337b234a86672936b9ae94de58226dc8c8b06ddc165823dc73ca13a563206c",
+    "build_helper_sha256": "960cfefefd307bd843cc45a5bf3b41e354334ce51be49526e6a412fd77d02c24",
     "gcc_version": "14.2.0",
     "make_version": "GNU Make 4.4.1",
     "node_version": "v24.22.1",
@@ -9,24 +9,26 @@
     "setup_helper_sha256": "6fc0772798865e3f5448b03fd58fc89492464cc6e1ab44b969126d7e68f4b2f4"
   },
   "checks": {
+    "css_payload": "passed",
     "local_browser": "deferred_to_secret_free_ci",
-    "packaged_css_source": "passed",
+    "package_independence": "passed",
     "packaged_syntax": "passed",
     "packaged_unit": "passed",
-    "source_unit": "passed"
+    "source_unit": "passed",
+    "upgrade_baseline": "actual 0.2.4-r1 APKs"
   },
-  "elapsed_seconds": 30.952,
+  "elapsed_seconds": 63.608,
   "package_source_clean": true,
   "packages": [
     {
-      "name": "luci-app-nova-dashboard-0.2.9-r1.apk",
-      "sha256": "464eba611227650af12683567b77e61e2b91437a7ff835afc9326ac84e7f4aee",
-      "size": 15550
+      "name": "luci-app-nova-dashboard-0.2.10-r1.apk",
+      "sha256": "78ad04fc568bee821cdf247e1bc120a11786dec5d07f9f3cacd4660f319bed41",
+      "size": 15558
     },
     {
-      "name": "luci-theme-nova-0.2.9-r1.apk",
-      "sha256": "60cdc885c15ee808ed31e63af915e487eca42e8cec55238cf8afaa3c22da66a9",
-      "size": 15366
+      "name": "luci-theme-nova-0.2.10-r1.apk",
+      "sha256": "39a2b86b93a51cb5d9f65b30794eab70a7ca28e5577d9eb14cb412f181368538",
+      "size": 15416
     }
   ],
   "repository": "qusica/luci-nova",
@@ -43,8 +45,8 @@
     "target": "x86/64"
   },
   "signing": "unsigned; no publisher key used locally",
-  "source_commit": "bae19af4ae15eec1e517b773a861c81bcdfa5dc6",
-  "source_date_epoch": 1794060636,
-  "source_tree": "2876865060baa2ee6607ca8b46ee7a9ca5caa6bf",
+  "source_commit": "403f7c3679313bb6fa701ad48bb74a8011b3151a",
+  "source_date_epoch": 1794100390,
+  "source_tree": "707ba3e4a434558ed2d83d847bdbbde8169e5400",
   "trust_scope": "Local provenance from a mutable build cache; not an independent build attestation."
 }

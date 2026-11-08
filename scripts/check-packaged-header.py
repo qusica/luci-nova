@@ -3,7 +3,7 @@
 from pathlib import Path
 import sys
 
-VERSION = b'0.2.9'
+VERSION = b'0.2.10'
 URLS = (
     b'"{{ media }}/cascade.css"',
     b'"{{ media }}/nova-lists.css"',

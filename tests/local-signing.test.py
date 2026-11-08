@@ -29,8 +29,8 @@ class HeaderTests(unittest.TestCase):
                        b'<script src="{{ media }}/nova-lists.js"></script>\n')
 
     def test_only_fixed_version_insertions_accepted(self):
-        actual = self.source.replace(b'.css"', b'.css?v=0.2.9"').replace(b'.js"', b'.js?v=0.2.9"')
-        actual = actual.replace(b'bootstrap/cascade.css?v=0.2.9', b'bootstrap/cascade.css').replace(b'bootstrap/mobile.css?v=0.2.9', b'bootstrap/mobile.css')
+        actual = self.source.replace(b'.css"', b'.css?v=0.2.10"').replace(b'.js"', b'.js?v=0.2.10"')
+        actual = actual.replace(b'bootstrap/cascade.css?v=0.2.10', b'bootstrap/cascade.css').replace(b'bootstrap/mobile.css?v=0.2.10', b'bootstrap/mobile.css')
         header.verify_header(self.source, actual)
 
     def test_missing_or_duplicate_urls_rejected(self):
@@ -40,7 +40,7 @@ class HeaderTests(unittest.TestCase):
 
     def test_other_header_changes_or_wrong_version_rejected(self):
         expected = header.expected_header(self.source)
-        for actual in (self.source, expected + b' ', expected.replace(b'0.2.9', b'0.2.8'), expected.replace(b'<link', b'<changed', 1)):
+        for actual in (self.source, expected + b' ', expected.replace(b'0.2.10', b'0.2.8'), expected.replace(b'<link', b'<changed', 1)):
             with self.assertRaises(ValueError):
                 header.verify_header(self.source, actual)
 
