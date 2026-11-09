@@ -57,7 +57,7 @@ try {
     ]));
     await styleLoaded;
     function check(condition,message){if(!condition)throw new Error(message);}
-    check(stylesheet.getAttribute('href')===${JSON.stringify(dashboardUrl)}+'?v=0.2.1','stale CSS link was not upgraded');
+    check(stylesheet.getAttribute('href')===${JSON.stringify(dashboardUrl)}+'?v=0.2.2','stale CSS link was not upgraded');
     const width=window.innerWidth;
     const expected=width>1350?6:width>780?3:width>530?2:1;
     const grid=getComputedStyle(document.querySelector('.nv-metric-grid'));

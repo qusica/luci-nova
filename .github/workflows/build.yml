@@ -35,6 +35,8 @@ jobs:
         run: node --test tests/asset-version.test.js
       - name: Test dashboard and navigation layout in Chrome
         run: node --test tests/browser-layout.test.js
+      - name: Test click-only menu interactions in Chrome
+        run: node --test tests/navigation-browser.test.js
       - name: Build from matching OpenWrt SDK
         uses: openwrt/gh-action-sdk@main
         env:
