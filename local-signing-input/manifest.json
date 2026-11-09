@@ -1,0 +1,51 @@
+{
+  "apk_tool_version": "apk-tools 3.0.5, compiled for x86_64.",
+  "build_recipe": {
+    "build_helper_sha256": "0f0551e062d98fbe6bc0b8ad2ae5ea6256f14f37ce5867fb77dcf03d8ab7540b",
+    "gcc_version": "14.2.0",
+    "make_version": "GNU Make 4.4.1",
+    "node_version": "v24.22.1",
+    "sdk_config_sha256": "5200d1126d5488116f6038d3de312c8cfedbe018b52a6f9e9b37843213d927ee",
+    "setup_helper_sha256": "6fc0772798865e3f5448b03fd58fc89492464cc6e1ab44b969126d7e68f4b2f4"
+  },
+  "checks": {
+    "local_browser": "deferred_to_secret_free_ci",
+    "package_solver": "passed",
+    "packaged_css_source": "passed",
+    "packaged_syntax": "passed",
+    "packaged_unit": "passed",
+    "source_unit": "passed"
+  },
+  "elapsed_seconds": 126.889,
+  "package_source_clean": true,
+  "packages": [
+    {
+      "name": "luci-app-nova-dashboard-0.2.11-r1.apk",
+      "sha256": "fa53da06c27a4891e2f48c3b95aaae83a3e888f71c30a72417348b149914e91f",
+      "size": 15647
+    },
+    {
+      "name": "luci-theme-nova-0.2.11-r1.apk",
+      "sha256": "8254c132ffe11a1e7a7902c0963f1f7180e32bee98f1cc1d5271de77193d0943",
+      "size": 15629
+    }
+  ],
+  "repository": "qusica/luci-nova",
+  "schema_version": 1,
+  "sdk": {
+    "feeds": {
+      "base": "64900e756efa667774214f9c6b17c113222e01f7",
+      "luci": "75a306df84a020c57a631ef5b4c02ace56d93387",
+      "packages": "093d551675b1119a06ef224d419905e8d6b2af1a"
+    },
+    "openwrt": "25.12.6",
+    "release_primary_fingerprint": "8A8BC12F46B836C0F9CDB36F1D53D1877742E911",
+    "sdk_sha256": "1864152619092e781fa36a401960c8e9ae42d6a364c44ee5f0b197ca5f3c0fcc",
+    "target": "x86/64"
+  },
+  "signing": "unsigned; no publisher key used locally",
+  "source_commit": "ceaaaae63ccc29c801025fe96139c722fee76927",
+  "source_date_epoch": 1794210225,
+  "source_tree": "3a805627751c9233cfb5d3d937cf72532da9c8cd",
+  "trust_scope": "Local provenance from a mutable build cache; not an independent build attestation."
+}
