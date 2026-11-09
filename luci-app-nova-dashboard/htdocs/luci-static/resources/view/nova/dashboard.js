@@ -5,7 +5,7 @@
 'require fs';
 
 // Keep in sync with PKG_VERSION; tests enforce this cache key on every release.
-var dashboardAssetVersion = '0.2.11';
+var dashboardAssetVersion = '0.2.12';
 
 var getBoard = rpc.declare({ object: 'system', method: 'board' });
 var getInfo = rpc.declare({ object: 'system', method: 'info' });
@@ -88,7 +88,9 @@ function accessDenied(error) {
     return denied.test(message);
 }
 function missingObject(error) {
-    var message = error && error.message || '';
+    // LuCI L.raise() appends stack frames to Error.message. Match the error
+    // line, not the whole message or text inside a diagnostic stack frame.
+    var message = (error && error.message || '').split(/[\r\n]/,1)[0];
     // An absent RPC object is not evidence that physical Wi-Fi is absent.
     // Do not classify an arbitrary JSON-RPC -32000 server error as not-found.
     var missing = /ubus code 4(?:\D|$)|(?:error|code) -32000: Object not found\s*$/i;

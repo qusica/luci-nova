@@ -13,6 +13,9 @@ wireless configuration is labelled unavailable, while permissions, timeouts,
 malformed replies and other failures retain their failure diagnostics. Only
 an exact ubus 4 or the canonical JSON-RPC `-32000: Object not found` message
 receives the unavailable label; a generic -32000 server error does not.
+LuCI appends stack frames to `Error.message`, so the missing-object
+classification checks only its first line. A stack frame cannot establish a
+missing object, and stack text is never displayed.
 Empty fallback configuration does not claim that saved interfaces are being
 displayed. Prior runtime radios remain visible with the stale-state warning
 until a successful runtime inventory replaces them.

@@ -2,7 +2,7 @@
 
 Nova is a dark LuCI theme and a companion status dashboard for OpenWrt and ImmortalWrt.
 
-> Preview 0.2.11: detected interface cards, live PPPoE status and searchable native LuCI lists. This is still experimental and has not been tested on every router or firmware. Keep Bootstrap installed for safe rollback.
+> Preview 0.2.12: detected interface cards, live PPPoE status and searchable native LuCI lists. This is still experimental and has not been tested on every router or firmware. Keep Bootstrap installed for safe rollback.
 
 ## Packages
 
@@ -40,9 +40,9 @@ opkg install /tmp/luci-app-nova-dashboard_*.ipk
 For **apk**, once the selected package is individually signed and the reviewed
 publisher key is trusted by your router:
 ```sh
-apk add /tmp/luci-theme-nova-0.2.11-r1.apk
+apk add /tmp/luci-theme-nova-0.2.12-r1.apk
 # Optional, separately:
-apk add /tmp/luci-app-nova-dashboard-0.2.11-r1.apk
+apk add /tmp/luci-app-nova-dashboard-0.2.12-r1.apk
 ```
 
 You may install, upgrade, or remove either Nova package independently. A build
@@ -139,6 +139,13 @@ rejects that mistake. To run the same comparison locally, set
 ## License
 
 Project-authored files: MIT. Templates adapted from the LuCI Bootstrap theme retain their upstream Apache-2.0 notices.
+
+## What's new in 0.2.12
+
+- Recognize an explicitly unavailable wireless service when LuCI appends a
+  diagnostic stack to its RPC error. Match only the first error line so a stack
+  frame cannot turn a generic, permission or timeout failure into an unavailable
+  service. This does not infer that wireless hardware is absent.
 
 ## What's new in 0.2.11
 
