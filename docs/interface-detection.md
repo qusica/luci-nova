@@ -5,6 +5,18 @@ authoritative runtime inventories. A successful empty inventory hides absent
 WAN and wireless cards. Configured but disconnected PPPoE interfaces and
 disabled radios remain visible. A failed request never means an empty inventory.
 
+An explicit object-not-found response from `network.wireless status` is shown
+as an unavailable wireless status service, not as absent hardware. The view
+still warns and retries, even if no saved radio sections are available. It
+does not create wireless cards to represent that unknown state. Missing
+wireless configuration is labelled unavailable, while permissions, timeouts,
+malformed replies and other failures retain their failure diagnostics. Only
+an exact ubus 4 or the canonical JSON-RPC `-32000: Object not found` message
+receives the unavailable label; a generic -32000 server error does not.
+Empty fallback configuration does not claim that saved interfaces are being
+displayed. Prior runtime radios remain visible with the stale-state warning
+until a successful runtime inventory replaces them.
+
 When runtime inventory is unavailable, Nova first preserves any previous
 successful runtime snapshot, with a stale-state warning. On an initial failure,
 it can read the already-authorized `network` interface and `wireless` radio UCI

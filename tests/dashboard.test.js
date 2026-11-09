@@ -256,6 +256,60 @@ function missingRuntime(app, values) {
     app.responses['network.wireless.status']=new Error('RPC call to network.wireless/status failed with ubus code 4: 未找到');
     app.responses['uci.get']=(config)=>({values:values[config]||{}});
 }
+for (const detail of ['ubus code 4: 未找到', 'error -32000: Object not found']) {
+    test('missing wireless service is unknown, not absent hardware: '+detail,async()=>{
+        const app=harness();
+        app.responses['network.wireless.status']=new Error('RPC call to network.wireless/status failed with '+detail);
+        app.responses['uci.get']={values:{}};
+        await app.mount();await app.poll();
+        assert.equal(count(app.root,'nv-wifi'),0);assert.equal(count(app.root,'nv-radio'),0);
+        assert.equal(count(app.root,'nv-detection-warning'),1);
+        assert.match(text(app.root),/无线状态服务不可用，无法确认无线接口是否存在/);
+        assert.match(text(app.root),/正在自动重试/);
+        assert.doesNotMatch(text(app.root),/无线检测失败|按已保存配置展示|无无线硬件|未检测到无线|Wi-Fi/);
+        app.responses['network.wireless.status']={radio0:radio('5g')};await app.poll();
+        assert.equal(count(app.root,'nv-wifi'),1);assert.equal(count(app.root,'nv-detection-warning'),0);
+        app.responses['network.wireless.status']={};await app.poll();
+        assert.equal(count(app.root,'nv-wifi'),0);assert.equal(count(app.root,'nv-detection-warning'),0);
+    });
+}
+for (const detail of ['error -32000: Server error', 'error -320000: Object not found', 'ubus code 40: Object not found', 'HTTP error 404: Not found', 'ubus code 7: Timeout', 'ubus code 6: Permission denied']) {
+    test('wireless failure is not relabelled as missing service: '+detail,async()=>{
+        const app=harness();
+        app.responses['network.wireless.status']=new Error(detail);app.responses['uci.get']={values:{}};
+        await app.mount();await app.poll();
+        assert.equal(count(app.root,'nv-detection-warning'),1);
+        assert.match(text(app.root),/无线检测失败/);assert.doesNotMatch(text(app.root),/无线状态服务不可用/);
+    });
+}
+test('missing wireless configuration remains visible without claiming missing hardware',async()=>{
+    const app=harness();
+    app.responses['network.wireless.status']=new Error('error -32000: Object not found');
+    app.responses['uci.get']=new Error('ubus code 4: 未找到');
+    await app.mount();await app.poll();
+    assert.equal(count(app.root,'nv-wifi'),0);assert.equal(count(app.root,'nv-radio'),0);
+    assert.match(text(app.root),/无线状态服务不可用/);assert.match(text(app.root),/无线配置不可用：对象不存在（ubus 4）/);
+    assert.doesNotMatch(text(app.root),/无线配置读取失败|按已保存配置展示|未检测到无线/);
+    app.responses['uci.get']={values:{radio0:{'.type':'wifi-device',band:'5g',disabled:'1'}}};await app.poll();
+    assert.equal(count(app.root,'nv-wifi'),1);assert.match(text(app.root),/按已保存配置展示/);
+    assert.doesNotMatch(text(app.root),/无线配置不可用/);
+});
+for (const detail of ['ubus code 6: Permission denied', 'ubus code 7: Timeout', 'error -32000: Server error']) {
+    test('wireless configuration failure remains a failure: '+detail,async()=>{
+        const app=harness();
+        app.responses['network.wireless.status']=new Error('ubus code 4: 未找到');
+        app.responses['uci.get']=new Error(detail);await app.mount();await app.poll();
+        assert.match(text(app.root),/无线配置读取失败/);assert.doesNotMatch(text(app.root),/无线配置不可用/);
+    });
+}
+test('missing wireless service preserves prior runtime radios as stale, not configured',async()=>{
+    const app=harness();await app.render([],{radio0:radio()});
+    app.responses['network.wireless.status']=new Error('error -32000: Object not found');
+    app.responses['uci.get']=new Error('ubus code 4: 未找到');await app.poll();
+    assert.equal(count(app.root,'nv-wifi'),1);
+    assert.match(text(app.root),/无线状态服务不可用/);assert.match(text(app.root),/已保留上次检测结果/);
+    assert.doesNotMatch(text(app.root),/按已保存配置展示/);
+});
 test('missing netifd retains configured LAN with unknown runtime and no phantom WAN/Wi-Fi',async()=>{
     const app=harness();missingRuntime(app,{network:{lan:{'.type':'interface',device:'br-lan',proto:'static'}}});await app.mount();
     assert.equal(count(app.root,'nv-radio'),1);assert.equal(count(app.root,'nv-internet'),0);assert.equal(count(app.root,'nv-wifi'),0);
@@ -379,11 +433,11 @@ test('read-only ACL covers strict inventories and no router configuration writes
 
 test('versioned stylesheet is upgraded once; render and remove maintain one poll',async()=>{
     const app=harness();await app.render();assert.equal(app.polls.size,1);
-    const style=app.document.head.children[0];assert.equal(style.attrs.href,'/luci-static/resources/nova/dashboard.css?v=0.2.10');
+    const style=app.document.head.children[0];assert.equal(style.attrs.href,'/luci-static/resources/nova/dashboard.css?v=0.2.11');
     assert.ok(fs.statSync(path.join(resources,'nova/dashboard.css')).size>0);
     for(const old of ['','?v=0.2.2']){
         app.view.remove();style.attrs.href='/luci-static/resources/nova/dashboard.css'+old;
-        await app.render();assert.equal(app.document.head.children.length,1);assert.match(style.attrs.href,/\?v=0\.2\.10$/);assert.equal(app.polls.size,1);
+        await app.render();assert.equal(app.document.head.children.length,1);assert.match(style.attrs.href,/\?v=0\.2\.11$/);assert.equal(app.polls.size,1);
     }
     app.view.remove();assert.equal(app.polls.size,0);
 });

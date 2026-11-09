@@ -39,7 +39,9 @@ header{
  box-shadow:none;overflow-y:auto;
 }
 header .brand{
- box-sizing:border-box;width:calc(100% + 16px);margin:0 0 9px -8px;padding:8px 12px;
+ /* Balance both gutters: a left-only negative margin leaves the right padding
+  * in the scrollable overflow area, creating an otherwise empty 8px scrollbar. */
+ box-sizing:border-box;width:calc(100% + 16px);margin:0 -8px 9px;padding:8px 12px;
  min-height:64px;display:flex;align-items:center;gap:12px;
  color:var(--nova-text);font-size:15px;font-weight:650;letter-spacing:.1px;
  text-decoration:none;border-bottom:1px solid var(--nova-border-soft);
@@ -280,7 +282,7 @@ footer{font-size:11px;line-height:1.6}
  /* Horizontal navigation uses pop-out menus, not the desktop scroll container. */
  header{position:relative;width:100%;height:auto;min-height:0;padding:0 10px 10px;border-right:0;border-bottom:1px solid var(--nova-border-soft);
   box-sizing:border-box;overflow:visible}
- header .brand{display:flex!important;width:calc(100% + 20px);margin:0 0 8px -10px}
+ header .brand{display:flex!important;width:calc(100% + 20px);margin:0 -10px 8px}
  #topmenu{flex-direction:row;flex-wrap:wrap;gap:3px}
  #topmenu>li{width:auto}
  #topmenu>li>a{padding:7px 10px;font-size:12px;min-height:35px}

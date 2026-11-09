@@ -42,7 +42,7 @@ if command -v fc-cache >/dev/null 2>&1; then
 fi
 # Each file launches a separate Chrome process. Serialize startup on small CI
 # runners; preserve all suites, assertions and their bounded CDP timeouts.
-node --test --test-concurrency=1 "$stage/tests/browser-layout.test.js" "$stage/tests/native-lists-browser.test.js" "$stage/tests/navigation-browser.test.js" "$stage/tests/visual-browser.test.js" "$stage/tests/native-spacing-browser.test.js"
+node --test --test-concurrency=1 "$stage/tests/browser-layout.test.js" "$stage/tests/native-lists-browser.test.js" "$stage/tests/navigation-browser.test.js" "$stage/tests/visual-browser.test.js" "$stage/tests/native-spacing-browser.test.js" "$stage/tests/sidebar-overflow-browser.test.js"
 
 # Independent dependency/solver coverage uses disposable roots and test copies.
 bash "$base/scripts/test-package-independence.sh" "$apk" "$theme" "$dashboard" "$stage/package-independence"

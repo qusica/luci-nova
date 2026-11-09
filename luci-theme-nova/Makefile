@@ -4,7 +4,7 @@ LUCI_TITLE:=Nova Dark LuCI Theme
 # The dashboard is optional. Keep theme installation and upgrades independent.
 LUCI_DEPENDS:=+luci-base +luci-theme-bootstrap
 PKG_LICENSE:=MIT AND Apache-2.0
-PKG_VERSION:=0.2.10
+PKG_VERSION:=0.2.11
 PKG_RELEASE:=1
 
 # The SDK csstidy optimizer corrupts merged rules in our modern CSS. Keep

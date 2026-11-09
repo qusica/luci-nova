@@ -5,7 +5,7 @@
 'require fs';
 
 // Keep in sync with PKG_VERSION; tests enforce this cache key on every release.
-var dashboardAssetVersion = '0.2.10';
+var dashboardAssetVersion = '0.2.11';
 
 var getBoard = rpc.declare({ object: 'system', method: 'board' });
 var getInfo = rpc.declare({ object: 'system', method: 'info' });
@@ -87,6 +87,13 @@ function accessDenied(error) {
     var denied = /ubus code 6(?:\D|$)|HTTP error (401|403)(?:\D|$)|(?:error|code) -32002(?:\D|$)|permission|access denied/i;
     return denied.test(message);
 }
+function missingObject(error) {
+    var message = error && error.message || '';
+    // An absent RPC object is not evidence that physical Wi-Fi is absent.
+    // Do not classify an arbitrary JSON-RPC -32000 server error as not-found.
+    var missing = /ubus code 4(?:\D|$)|(?:error|code) -32000: Object not found\s*$/i;
+    return !accessDenied(error) && missing.test(message);
+}
 function configuredInventory(value, type) {
     if (!object(value) || !object(value.values) || Object.keys(value.values).some(function(name) { return !object(value.values[name]); }))
         throw new Error('Invalid configuration inventory');
@@ -106,6 +113,7 @@ function readDetection() {
     function inventory(task, name) {
         return Promise.resolve(task).catch(function(error) {
             errors[name] = detectionError(error);
+            errors[name+'Missing'] = missingObject(error);
             denied[name] = accessDenied(error);
             return null;
         });
@@ -399,10 +407,10 @@ return view.extend({
         var clientsKnown=detected.wireless && wifiAll.every(function(n){return n.known;});
         var warnings=[];
         if(!detected.interfaces) warnings.push('接口检测失败，无法确认 WAN/LAN 是否存在'+(detected.errors && detected.errors.interfaces ? '：'+detected.errors.interfaces : ''));
-        if(!detected.wireless) warnings.push('无线检测失败，无法确认无线接口是否存在'+(detected.errors && detected.errors.wireless ? '：'+detected.errors.wireless : ''));
+        if(!detected.wireless) warnings.push((detected.errors && detected.errors.wirelessMissing ? '无线状态服务不可用' : '无线检测失败')+'，无法确认无线接口是否存在'+(detected.errors && detected.errors.wireless ? '：'+detected.errors.wireless : ''));
         if(detected.errors && detected.errors.interfaceConfig)warnings.push('网络配置读取失败：'+detected.errors.interfaceConfig);
-        if(detected.errors && detected.errors.wirelessConfig)warnings.push('无线配置读取失败：'+detected.errors.wirelessConfig);
-        if(detected.interfacesConfigured || detected.wirelessConfigured) warnings.push('按已保存配置展示，运行状态未知，不能据此确认物理接口存在');
+        if(detected.errors && detected.errors.wirelessConfig)warnings.push((detected.errors.wirelessConfigMissing?'无线配置不可用：':'无线配置读取失败：')+detected.errors.wirelessConfig);
+        if((detected.interfacesConfigured && entries.length) || (detected.wirelessConfigured && nets.length)) warnings.push('按已保存配置展示，运行状态未知，不能据此确认物理接口存在');
         if((!detected.interfaces && !detected.interfacesConfigured && (wan || hasLan)) || (!detected.wireless && !detected.wirelessConfigured && nets.length)) warnings.push('已保留上次检测结果，状态可能已过期');
         var channels=[], clients=[];
         shownBands.forEach(function(band){
