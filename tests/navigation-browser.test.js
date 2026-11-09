@@ -78,14 +78,19 @@ function fixture(directory) {
     fs.copyFileSync(path.join(root, 'cascade.css'), path.join(directory, 'cascade.css'));
     fs.copyFileSync(path.join(root, 'nova-shell.js'), path.join(directory, 'nova-shell.js'));
     const groups = ['status', 'system', 'network'].map((name, index) =>
-        `<li class="dropdown${index === 0 ? ' active' : ''}" id="${name}"><a class="menu" id="${name}-toggle" href="#">${['状态', '系统', '网络'][index]}</a><ul class="dropdown-menu"><li><a id="${name}-first" href="leaf.html?from=${name}">概览</a></li><li><a href="leaf.html?second=${name}">设置</a></li><li><a href="leaf.html?third=${name}">日志</a></li></ul></li>`).join('');
+        `<li class="dropdown${index === 0 ? ' active' : ''}" id="${name}"><a class="menu" id="${name}-toggle" href="#">${['状态', '系统', '网络'][index]}</a><ul class="dropdown-menu"><li><a id="${name}-first" href="admin/${name}/leaf.html?from=${name}">概览</a></li><li><a href="admin/${name}/leaf.html?second=${name}">设置</a></li><li><a href="admin/${name}/leaf.html?third=${name}">日志</a></li></ul></li>`).join('');
     fs.writeFileSync(path.join(directory, 'index.html'), `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<style>body{margin:0}ul{list-style:none}a{cursor:pointer}.dropdown-menu{display:none}.dropdown:hover ul.dropdown-menu{display:block}</style>
+<!-- Relevant stock Bootstrap cascade: test the inherited arrow, offscreen
+     dropdown positioning and native list sizing, not just clean standalone CSS. -->
+<style>*{box-sizing:border-box}body{margin:0}ul{list-style:none;margin:0 0 9px 25px;padding:0}a{cursor:pointer}.dropdown-menu{display:none;position:absolute;left:-9999px;min-width:max-content;padding:6px 0}.nav .dropdown-menu li a{padding:4px 15px}a.menu:after{width:0;height:0;display:inline-block;content:"&darr;";text-indent:-99999px;margin-top:8px;margin-left:4px;border-left:4px solid transparent;border-right:4px solid transparent;border-top:4px solid #fff;opacity:.5}.dropdown:hover ul.dropdown-menu{display:block;left:0}</style>
 <link rel="stylesheet" href="cascade.css"><script defer src="nova-shell.js"></script>
 <header><a class="brand" href="index.html"><span class="nova-brand-mark">N</span>Nova</a><ul id="topmenu" class="nav"></ul></header>
-<main id="maincontent" class="container"><button id="outside" style="position:fixed;right:20px;bottom:20px">Outside</button></main>
-<script>addEventListener('load',()=>setTimeout(()=>{document.getElementById('topmenu').innerHTML=${JSON.stringify(groups + '<li><a id="leaf" href="leaf.html?from=top">退出</a></li>')};window.fixtureReady=true;},30));</script>`);
-    fs.writeFileSync(path.join(directory, 'leaf.html'), '<!doctype html><title>Native destination</title><h1 id="destination">Native navigation succeeded</h1>');
+<main id="maincontent" class="container"><input id="nova-search" aria-label="Search menu"><button id="outside" style="position:fixed;right:20px;bottom:20px">Outside</button></main>
+<script>addEventListener('load',()=>setTimeout(()=>{document.getElementById('topmenu').innerHTML=${JSON.stringify(groups + '<li><a id="leaf" href="admin/logout/leaf.html?from=top">退出</a></li>')};window.fixtureReady=true;},30));</script>`);
+    for (const name of ['status', 'system', 'network', 'logout']) {
+        fs.mkdirSync(path.join(directory, 'admin', name), { recursive: true });
+        fs.writeFileSync(path.join(directory, 'admin', name, 'leaf.html'), '<!doctype html><title>Native destination</title><h1 id="destination">Native navigation succeeded</h1>');
+    }
     return pathToFileURL(path.join(directory, 'index.html')).href;
 }
 
@@ -164,9 +169,12 @@ test('click-only LuCI navigation handles real hover, keyboard and touch', { time
         const focus = id => evaluate(`document.getElementById(${JSON.stringify(id)}).focus()`);
         const active = () => evaluate('document.activeElement.id');
 
-        for (const width of [1180, 528]) {
+        for (const width of [1180, 768, 528]) {
             await load(width);
             await state([false, false, false]); // Even the active route is closed until clicked.
+            assert.deepEqual(await evaluate('Array.from(document.querySelectorAll("#topmenu > li > a"), a => a.dataset.novaIcon)'), ['status', 'system', 'network', 'logout']);
+            const iconSizes = await evaluate('Array.from(document.querySelectorAll(".nova-menu-icon"), s => {const r=s.getBoundingClientRect(); return [r.width,r.height,s.getAttribute("aria-hidden"),s.getAttribute("focusable")]})');
+            for (const size of iconSizes) assert.deepEqual(size, [width > 900 ? 20 : 18, width > 900 ? 20 : 18, 'true', 'false']);
             const baseline = await rectangles();
             for (const id of ['status-toggle', 'system-toggle', 'network-toggle', 'leaf']) {
                 await move(id);
@@ -181,7 +189,13 @@ test('click-only LuCI navigation handles real hover, keyboard and touch', { time
                 await state([0, 1, 2].map(i => i === index));
                 sameRect(before, Object.values(await rect(id)), `opening moved its control at ${width}px`);
                 await point(id.replace('-toggle', '-first'));
-                if (width === 528) {
+                const geometry = await evaluate(`(()=>{const a=document.getElementById(${JSON.stringify(id)}), child=document.getElementById(${JSON.stringify(id.replace('-toggle', '-first'))});function textRect(e){const range=document.createRange();range.selectNodeContents([...e.childNodes].find(n=>n.nodeType===3&&n.textContent.trim()));const r=range.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom}}const r=a.getBoundingClientRect(),c=child.getBoundingClientRect(),icon=a.querySelector('svg').getBoundingClientRect(),arrow=getComputedStyle(a,'::after');return {label:textRect(a),child:textRect(child),right:r.right,iconRight:icon.right,arrowPosition:arrow.position,arrowRight:arrow.right,childRight:c.right,menuRight:child.closest('ul').getBoundingClientRect().right}})()`);
+                assert.ok(geometry.label.left > geometry.iconRight, 'icon and label overlap');
+                assert.equal(geometry.arrowPosition, 'absolute', 'Bootstrap inline triangle remains');
+                assert.ok(geometry.label.right < geometry.right - parseFloat(geometry.arrowRight) - 6, 'arrow overlaps category label');
+                assert.ok(geometry.childRight <= geometry.menuRight + 1, 'submenu padding overflows its container');
+                if (width > 900) assert.ok(Math.abs(geometry.label.left - geometry.child.left) < 1, 'submenu text is not aligned with its parent label');
+                if (width <= 900) {
                     assert.ok(await evaluate(`(()=>{const menu=document.getElementById(${JSON.stringify(id)}).nextElementSibling;const r=menu.getBoundingClientRect();const link=menu.querySelector('li:last-child a');const last=link.getBoundingClientRect();return r.bottom>document.querySelector('header').getBoundingClientRect().bottom&&link.contains(document.elementFromPoint(last.x+last.width/2,last.y+last.height/2))})()`), 'narrow submenu must be hittable beyond header bounds');
                 }
                 await click(id);
@@ -208,6 +222,7 @@ test('click-only LuCI navigation handles real hover, keyboard and touch', { time
             await key('ArrowDown', 'ArrowDown', 40);
             await state([true, false, false]);
             assert.equal(await active(), 'status-first', 'ArrowDown must focus first submenu link');
+            await point('status-first'); // Keyboard opening must work without hover, including tablet widths.
             await key('Escape', 'Escape', 27);
             await state([false, false, false]);
             assert.equal(await active(), 'status-toggle', 'Escape must restore toggle focus');
@@ -223,6 +238,18 @@ test('click-only LuCI navigation handles real hover, keyboard and touch', { time
             await click('leaf');
             await until('!!document.getElementById("destination") && location.search === "?from=top"', 'top-level leaf did not navigate normally');
         }
+        await load(1180);
+        await evaluate(`(()=>{const menu=document.getElementById('topmenu');menu.prepend(menu.lastElementChild);menu.insertAdjacentHTML('afterbegin','<li><a id="custom" href="/cgi-bin/luci/admin/custom">A long custom plugin name that wraps without hiding its icon</a></li><li><a id="dashboard" href="/cgi-bin/luci/admin/nova">仪表盘</a></li>')})()`);
+        await until('document.querySelectorAll("#topmenu .nova-menu-icon").length===6', 'asynchronous added menu icons missing');
+        assert.deepEqual(await evaluate('Array.from(document.querySelectorAll("#topmenu > li > a"),a=>a.dataset.novaIcon)'), ['folder','dashboard','logout','status','system','network']);
+        await evaluate(`(()=>{const menu=document.getElementById('topmenu');for(let i=0;i<4;i++){const marker=document.createElement('span');menu.append(marker);marker.remove()}})()`);
+        await settle();
+        assert.equal(await evaluate('document.querySelectorAll(".nova-menu-icon").length'), 6, 'observer duplicated icons');
+        assert.equal(await evaluate('document.getElementById("custom").textContent'), 'A long custom plugin name that wraps without hiding its icon', 'SVG polluted accessible label');
+        assert.ok(await evaluate(`(()=>{const a=document.getElementById('custom'),r=a.getBoundingClientRect(),icon=a.querySelector('svg').getBoundingClientRect();return icon.width===20 && icon.left>=r.left && icon.right<r.right && a.scrollWidth<=a.clientWidth})()`), 'long category label overflows or squashes its icon');
+        await evaluate(`(()=>{const s=document.getElementById('nova-search');s.value='网络';s.dispatchEvent(new Event('input',{bubbles:true}))})()`);
+        assert.equal(await evaluate('document.getElementById("network").style.display'), '', 'localized menu search stopped working');
+        assert.equal(await evaluate('document.getElementById("system").style.display'), 'none', 'search does not filter unrelated menu');
         await load(528, true);
         await tap('network-toggle');
         await state([false, false, true]);
@@ -233,7 +260,7 @@ test('click-only LuCI navigation handles real hover, keyboard and touch', { time
         await state([false, false, true]);
         await tap('network-first');
         await until('!!document.getElementById("destination") && location.search === "?from=network"', 'touch submenu link did not navigate normally');
-        console.log('Navigation passed: real hover/click and keyboard at 1180/528px; touch at 528px.');
+        console.log('Navigation passed: route icons, indentation, real hover/click and keyboard at 1180/768/528px; asynchronous reorder and touch at 528px.');
     } finally {
         await browser.close();
         fs.rmSync(temporary, { recursive: true, force: true });
