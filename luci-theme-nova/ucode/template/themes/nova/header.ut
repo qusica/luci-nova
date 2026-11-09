@@ -32,9 +32,9 @@
 		<meta name="viewport" content="width=device-width, initial-scale=1">
 		<meta name="darkreader-lock">
 		<link rel="stylesheet" href="/luci-static/bootstrap/cascade.css">
+		<link rel="stylesheet" media="only screen and (max-device-width: 854px)" href="/luci-static/bootstrap/mobile.css" />
 		<link rel="stylesheet" href="{{ media }}/cascade.css">
 		<link rel="stylesheet" href="{{ media }}/nova-lists.css">
-		<link rel="stylesheet" media="only screen and (max-device-width: 854px)" href="/luci-static/bootstrap/mobile.css" />
 		
 		<link rel="icon" href="{{ media }}/logo.svg" sizes="any">
 		{% if (dispatched?.css): %}
@@ -50,7 +50,8 @@
 	<body class="lang_{{ dispatcher.lang }}" data-page="{{ entityencode(join('-', length(ctx.request_path) ? ctx.request_path : ctx.path), true) }}">
 		{% if (!blank_page): %}
 		<header>
-			<a class="brand" href="{{ dispatcher.build_url("admin/nova") }}"><span class="nova-brand-mark">N</span><span class="nova-brand-name">Nova</span></a><span class="nova-hostname">{{ striptags(boardinfo.hostname ?? '?') }}</span>
+			{# Let LuCI choose the first accessible page, including the optional dashboard. #}
+			<a class="brand" href="{{ dispatcher.build_url("admin") }}"><span class="nova-brand-mark">N</span><span class="nova-brand-name">Nova</span></a><span class="nova-hostname">{{ striptags(boardinfo.hostname ?? '?') }}</span>
 			<ul class="nav" id="topmenu" style="display:none"></ul>
 			<div class="nova-sidebar-foot"><span class="nova-footer-dot">●</span> Nova for OpenWrt</div>
 		</header>

@@ -2,12 +2,12 @@
 
 Nova is a dark LuCI theme and a companion status dashboard for OpenWrt and ImmortalWrt.
 
-> Preview 0.2.5: detected interface cards, live PPPoE status and searchable native LuCI lists. This is still experimental and has not been tested on every router or firmware. Keep Bootstrap installed for safe rollback.
+> Preview 0.2.12: detected interface cards, live PPPoE status and searchable native LuCI lists. This is still experimental and has not been tested on every router or firmware. Keep Bootstrap installed for safe rollback.
 
 ## Packages
 
-- `luci-theme-nova` — dark visual theme, with Bootstrap as its supported base.
-- `luci-app-nova-dashboard` — independent LuCI dashboard under **Nova Dashboard / Nova 仪表盘** (also available via **Status → Nova Dashboard**).
+- `luci-theme-nova` — standalone dark visual theme, with Bootstrap as its supported base. It does not depend on the dashboard.
+- `luci-app-nova-dashboard` — optional, independent LuCI dashboard under **Nova Dashboard / Nova 仪表盘** (also available via **Status → Nova Dashboard**). It can also run with Bootstrap without installing the Nova theme.
 
 ## IPK and APK builds
 
@@ -28,18 +28,27 @@ browser resources are platform-independent; the packages are intended for the
 
 ## Install
 
-Download both packages for your firmware series from a successful GitHub Actions build (or a future release). Transfer the files to your router.
+Download the theme package for your firmware series from a successful signed build (or a future release). Download the dashboard only if you want its extra status page. Transfer only the packages you intend to install to your router.
 
 For **opkg**:
 ```sh
-opkg install /tmp/luci-theme-nova_*.ipk /tmp/luci-app-nova-dashboard_*.ipk
+opkg install /tmp/luci-theme-nova_*.ipk
+# Optional, separately:
+opkg install /tmp/luci-app-nova-dashboard_*.ipk
 ```
 
-For **apk**, once both packages are individually signed and the reviewed
+For **apk**, once the selected package is individually signed and the reviewed
 publisher key is trusted by your router:
 ```sh
-apk add /tmp/luci-theme-nova-*.apk /tmp/luci-app-nova-dashboard-*.apk
+apk add /tmp/luci-theme-nova-0.2.12-r1.apk
+# Optional, separately:
+apk add /tmp/luci-app-nova-dashboard-0.2.12-r1.apk
 ```
+
+You may install, upgrade, or remove either Nova package independently. A build
+producing both packages with the same version is not an installation dependency.
+The brand link uses LuCI's normal home entry: it opens the optional dashboard
+when that is the first accessible page, otherwise a native LuCI page.
 
 The ordinary CI APK artifacts are unsigned. LuCI upload verifies package
 signatures and will reject them. The separate **Build signed APK packages**
@@ -82,7 +91,7 @@ The output suffix (`.ipk` or `.apk`) is decided by the SDK. Prefer official vers
 Run the dependency-free dashboard rendering tests with Node.js 18 or newer:
 
 ```sh
-node --test tests/dashboard.test.js tests/native-lists.test.js tests/navigation.test.js tests/menu-localization.test.js
+node --test tests/dashboard.test.js tests/native-lists.test.js tests/navigation.test.js tests/menu-localization.test.js tests/package-independence.test.js
 node --test tests/asset-version.test.js
 node --check luci-app-nova-dashboard/htdocs/luci-static/resources/view/nova/dashboard.js
 node --check luci-theme-nova/htdocs/luci-static/nova/nova-shell.js
@@ -98,7 +107,14 @@ Chrome or Chromium (the GitHub runner includes `google-chrome`):
 CHROME_BIN=google-chrome node --test tests/browser-layout.test.js
 CHROME_BIN=google-chrome node --test tests/navigation-browser.test.js
 CHROME_BIN=google-chrome node --test tests/native-lists-browser.test.js
+CHROME_BIN=google-chrome node --test tests/visual-browser.test.js
 ```
+
+When running all four browser files together, pass `--test-concurrency=1` to Node.
+Each suite launches its own Chrome process; serial startup avoids resource
+contention on small runners without weakening assertions or timeouts.
+CI and extracted-APK checks also create a writable, run-local Fontconfig cache
+and warm it before Chrome starts; cache failures remain test failures.
 
 The browser test uses local fixtures only. It starts with a stale stylesheet link,
 loads the current versioned CSS, and checks the actual Nova styles. It does not
@@ -123,6 +139,74 @@ rejects that mistake. To run the same comparison locally, set
 ## License
 
 Project-authored files: MIT. Templates adapted from the LuCI Bootstrap theme retain their upstream Apache-2.0 notices.
+
+## What's new in 0.2.12
+
+- Recognize an explicitly unavailable wireless service when LuCI appends a
+  diagnostic stack to its RPC error. Match only the first error line so a stack
+  frame cannot turn a generic, permission or timeout failure into an unavailable
+  service. This does not infer that wireless hardware is absent.
+
+## What's new in 0.2.11
+
+- Remove the sidebar's empty horizontal scrollbar by balancing the brand's
+  full-width margins. Long menus still scroll vertically, with keyboard focus
+  kept visible. Source and extracted-APK tests now inspect the sidebar itself,
+  not only the document width, with the complete native Bootstrap cascade.
+- Identify an explicitly unavailable wireless runtime service without claiming
+  that the device has no wireless hardware. Permission, transport and ambiguous
+  RPC failures remain visible as detection failures. Missing saved configuration
+  no longer claims that an empty fallback is being displayed.
+
+## What's new in 0.2.10
+
+- Make the theme brand link use native LuCI home instead of requiring the
+  optional dashboard route. Native access checks and first-page selection stay
+  in LuCI, including when the dashboard is missing or inaccessible.
+- Clarify independent package installation and upgrades. Verify actual APK
+  dependency metadata, separate installation, independent upgrades, optional
+  removal and inconsistent-checksum diagnostics in disposable package roots.
+- Retain the existing native forms, lists, navigation, dashboard and visuals.
+
+## What's new in 0.2.9
+
+- Normalize native map, heading, description, section and form spacing across
+  system, status and network pages. Inactive native tab panels no longer leave
+  padded empty strips, and clock action buttons have their own wrapping row.
+- Load Bootstrap mobile before Nova so the same spacing rules win on phones.
+  Preserve native joined widgets, dependency visibility and tab behavior.
+- Add a faithful native Bootstrap fixture with true device-width tests, repeated
+  tab changes, nested sections, action groups and modal containment. Source and
+  extracted APK checks run the same suite.
+
+## What's new in 0.2.8
+
+- Give text inputs, selects, textareas and native dropdowns a gentle focus glow
+  rather than a detached outline. Invalid fields retain red borders and glow;
+  disabled fields remain quiet. Forced-colors mode keeps a system focus outline.
+- Make native tab targets 38 px high (40 px on narrow screens) with more padding
+  and gaps, preserving native tab behavior and keyboard access.
+
+- Preserve CSS bytes through packaging. The SDK's csstidy optimizer was observed
+  replacing muted-label declarations with an unrelated radio-meter background.
+- Verify every packaged stylesheet against source, plus exact small-label color,
+  transparency and size in the source and packaged visual browser suites.
+- JavaScript remains minified. APK compression still keeps the package compact.
+
+## What's new in 0.2.7
+
+- Fix an actual native-LuCI rendering issue: dashboard SVG icons and charts now explicitly use the SVG namespace. LuCI's generic `E()` creates HTML elements even when the tag is `svg`, so that helper cannot create working vectors.
+- Browser fixtures now reproduce LuCI's actual HTML-only `E()` behavior. Regression checks verify SVG namespace, case-sensitive viewBox attributes and nonempty rendered icon geometry, including extracted APKs.
+- Asset versions advance again because 0.2.6 was installed during live acceptance. The Quiet Slate palette and all data/configuration behavior are unchanged.
+
+## What's new in 0.2.6
+
+- **Quiet Slate:** a unified graphite and ice-blue visual system across navigation, native LuCI forms, the dashboard, lists and the favicon. Mint indicates live activity, amber marks warnings, and lavender distinguishes uploads. No fluorescent lime accents remain.
+- Larger tabular metrics, clearer secondary labels, calmer borders and a more spacious header improve long-session readability. Consistent decorative line icons replace the misleading checkmarks previously shown beside every metric.
+- Keyboard focus remains visible. Download/upload charts also differ by line pattern, not color alone. Existing detected-interface data, native actions, menu interactions, list search and pagination are unchanged.
+- A dedicated secret-free visual review checks 320/390/768/1024/1440 px layouts, key small-text contrast, unknown-state cards and decorative SVG accessibility. Screenshots use **synthetic test data**, not router telemetry. The same browser test is run against the minified APK assets.
+
+See [visual design notes](docs/visual-design.md) for palette, semantics and acceptance boundaries.
 
 ## What's new in 0.2.5
 
@@ -169,9 +253,18 @@ Detection uses strict `network.interface dump` and `network.wireless status` rea
 
 ### Updating an existing installation
 
-Make sure to download the fresh 0.2.3 packages from a **successful** CI run.
-Install both packages again using your device's normal package-manager update/upgrade procedure,
-and reload the browser without cached assets. SSH rollback remains available above.
+Download the fresh package you want to update from a **successful signed** build.
+Use the device's normal package-manager update procedure for that package, then
+reload the browser. Updating the theme does not require updating or installing
+the dashboard, and updating the dashboard does not require updating the theme.
+Keep Bootstrap installed. SSH rollback remains available above.
+
+If APK reports a `world[...]` checksum conflict involving an unchanged package,
+do not infer a dependency or uninstall working packages. A matching local-file
+checksum pin is supported and should not block an independent upgrade. Compare
+the exact constraint with the installed package before repairing an inconsistent
+pin. See [independent installation and APK diagnostics](docs/package-independence.md).
+
 
 ### Current limitations
 

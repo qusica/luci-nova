@@ -5,7 +5,7 @@
 'require fs';
 
 // Keep in sync with PKG_VERSION; tests enforce this cache key on every release.
-var dashboardAssetVersion = '0.2.5';
+var dashboardAssetVersion = '0.2.12';
 
 var getBoard = rpc.declare({ object: 'system', method: 'board' });
 var getInfo = rpc.declare({ object: 'system', method: 'info' });
@@ -87,6 +87,15 @@ function accessDenied(error) {
     var denied = /ubus code 6(?:\D|$)|HTTP error (401|403)(?:\D|$)|(?:error|code) -32002(?:\D|$)|permission|access denied/i;
     return denied.test(message);
 }
+function missingObject(error) {
+    // LuCI L.raise() appends stack frames to Error.message. Match the error
+    // line, not the whole message or text inside a diagnostic stack frame.
+    var message = (error && error.message || '').split(/[\r\n]/,1)[0];
+    // An absent RPC object is not evidence that physical Wi-Fi is absent.
+    // Do not classify an arbitrary JSON-RPC -32000 server error as not-found.
+    var missing = /ubus code 4(?:\D|$)|(?:error|code) -32000: Object not found\s*$/i;
+    return !accessDenied(error) && missing.test(message);
+}
 function configuredInventory(value, type) {
     if (!object(value) || !object(value.values) || Object.keys(value.values).some(function(name) { return !object(value.values[name]); }))
         throw new Error('Invalid configuration inventory');
@@ -106,6 +115,7 @@ function readDetection() {
     function inventory(task, name) {
         return Promise.resolve(task).catch(function(error) {
             errors[name] = detectionError(error);
+            errors[name+'Missing'] = missingObject(error);
             denied[name] = accessDenied(error);
             return null;
         });
@@ -172,9 +182,38 @@ function children(contents) {
     return Array.isArray(contents) ? contents.filter(function(child) { return child != null; }) : contents;
 }
 function el(kind, klass, contents){return E(kind, {'class':klass}, children(contents));}
+// All dashboard ornaments use one line-icon family. They are decorative, not
+// health checks: unavailable CPU/storage/network data must never get a checkmark.
+// LuCI E() uses document.createElement, including for an "svg" tag. SVG roots
+// and their shapes must be created explicitly in the SVG namespace.
+function svg(kind, attrs, content) {
+    var element = document.createElementNS('http://www.w3.org/2000/svg', kind);
+    Object.keys(attrs || {}).forEach(function(key){element.setAttribute(key,attrs[key]);});
+    (content || []).forEach(function(child){element.appendChild(child);});
+    return element;
+}
+function icon(kind) {
+    var paths = {
+        cpu:['7,7 17,7 17,17 7,17 7,7','10,10 14,10 14,14 10,14 10,10','9,3 9,7','15,3 15,7','9,17 9,21','15,17 15,21','3,9 7,9','3,15 7,15','17,9 21,9','17,15 21,15'],
+        memory:['3,7 21,7 21,17 3,17 3,7','7,10 7,14','11,10 11,14','15,10 15,14','7,17 7,20','12,17 12,20','17,17 17,20'],
+        disk:['5,4 19,4 21,15 21,20 3,20 3,15 5,4','3,15 21,15','16,18 18,18'],
+        wifi:['2,8 6,5 12,3 18,5 22,8','5,12 8,9 12,8 16,9 19,12','9,16 12,14 15,16','12,20 12,20'],
+        signal:['4,19 4,16','9,19 9,12','14,19 14,8','19,19 19,4'],
+        'rate-down':['8,3 8,20 3,15','8,20 13,15','16,21 16,4 11,9','16,4 21,9'],
+        router:['4,11 20,11 21,20 3,20 4,11','7,11 5,3','17,11 19,3','7,16 7,16','11,16 11,16','15,16 17,16'],
+        lan:['4,7 20,7 20,20 4,20 4,7','8,7 8,3 16,3 16,7','8,11 8,15','12,11 12,15','16,11 16,15'],
+        client:['3,4 21,4 21,16 3,16 3,4','8,21 16,21','12,16 12,21'],
+        internet:['4,7 8,3 16,3 20,7 21,12 20,17 16,21 8,21 4,17 3,12 4,7','3,12 21,12','12,3 8,8 8,16 12,21 16,16 16,8 12,3'],
+        path:['3,5 9,5 9,11 3,11 3,5','15,13 21,13 21,19 15,19 15,13','6,11 6,16 15,16','18,13 18,8 9,8'],
+        activity:['2,13 6,13 9,5 14,20 17,10 19,13 22,13']
+    };
+    return svg('svg', {'class':'nv-icon','viewBox':'0 0 24 24','fill':'none','stroke':'currentColor',
+        'stroke-width':'1.6','stroke-linecap':'round','stroke-linejoin':'round','aria-hidden':'true','focusable':'false'},
+        (paths[kind] || paths.activity).map(function(points){return svg('polyline',{'points':points});}));
+}
 function metric(name,value,detail,key){
     return el('div','nv-metric',[
-        el('span','nv-metric-icon', '✓'),
+        el('span','nv-metric-icon', icon(key)),
         el('div','nv-metric-main',[
             el('div','nv-metric-label',name),
             E('strong',key ? {'data-nova':key} : {},value),
@@ -183,7 +222,7 @@ function metric(name,value,detail,key){
     ]);
 }
 function detailLine(a,b){return el('span','nv-detail-line',[label(a),el('strong','',b)]);}
-function node(klass,icon,name,sub,details,target) {
+function node(klass,iconKind,name,sub,details,target) {
     return E('button',{
         'class':'nv-node '+klass,'type':'button','data-nova-node':klass.split(' ')[0]+'|'+name,
         'title':details,
@@ -200,7 +239,7 @@ function node(klass,icon,name,sub,details,target) {
             }
         }
     },[
-        el('span','nv-node-icon',icon),
+        el('span','nv-node-icon',icon(iconKind)),
         el('span','nv-node-text',[el('strong','nv-truncate',name),el('small','nv-truncate',sub)])
     ]);
 }
@@ -262,9 +301,9 @@ function wifiCard(band,g){
             detailLine('接口', net&&net.getIfname&&net.getIfname() || '—')
         ]),
         el('div','nv-mini-chart',[
-            E('svg',{'viewBox':'0 0 360 76','preserveAspectRatio':'none','aria-label':bandName(band)+' 实时吞吐量'},[
-                E('line',{'x1':'0','y1':'65','x2':'360','y2':'65','class':'nv-axis'}),
-                E('polyline',{'data-nova':'wifi-'+id,'class':'nv-spark','points':'0,65 360,65'})
+            svg('svg',{'viewBox':'0 0 360 76','preserveAspectRatio':'none','aria-label':bandName(band)+' 实时吞吐量'},[
+                svg('line',{'x1':'0','y1':'65','x2':'360','y2':'65','class':'nv-axis'}),
+                svg('polyline',{'data-nova':'wifi-'+id,'class':'nv-spark','points':'0,65 360,65'})
             ]),
             E('span',{'data-nova':'wifi-rate-'+id,'class':'nv-mini-rate'},net && net.isKnown && !net.isKnown() ? '运行状态未知' : net && net.isUp && net.isUp() ? '等待采样' : '接口未连接')
         ])
@@ -370,30 +409,30 @@ return view.extend({
         var clientsKnown=detected.wireless && wifiAll.every(function(n){return n.known;});
         var warnings=[];
         if(!detected.interfaces) warnings.push('接口检测失败，无法确认 WAN/LAN 是否存在'+(detected.errors && detected.errors.interfaces ? '：'+detected.errors.interfaces : ''));
-        if(!detected.wireless) warnings.push('无线检测失败，无法确认无线接口是否存在'+(detected.errors && detected.errors.wireless ? '：'+detected.errors.wireless : ''));
+        if(!detected.wireless) warnings.push((detected.errors && detected.errors.wirelessMissing ? '无线状态服务不可用' : '无线检测失败')+'，无法确认无线接口是否存在'+(detected.errors && detected.errors.wireless ? '：'+detected.errors.wireless : ''));
         if(detected.errors && detected.errors.interfaceConfig)warnings.push('网络配置读取失败：'+detected.errors.interfaceConfig);
-        if(detected.errors && detected.errors.wirelessConfig)warnings.push('无线配置读取失败：'+detected.errors.wirelessConfig);
-        if(detected.interfacesConfigured || detected.wirelessConfigured) warnings.push('按已保存配置展示，运行状态未知，不能据此确认物理接口存在');
+        if(detected.errors && detected.errors.wirelessConfig)warnings.push((detected.errors.wirelessConfigMissing?'无线配置不可用：':'无线配置读取失败：')+detected.errors.wirelessConfig);
+        if((detected.interfacesConfigured && entries.length) || (detected.wirelessConfigured && nets.length)) warnings.push('按已保存配置展示，运行状态未知，不能据此确认物理接口存在');
         if((!detected.interfaces && !detected.interfacesConfigured && (wan || hasLan)) || (!detected.wireless && !detected.wirelessConfigured && nets.length)) warnings.push('已保留上次检测结果，状态可能已过期');
         var channels=[], clients=[];
         shownBands.forEach(function(band){
             var group=groups[band], title=bandName(band);
-            channels.push(node('nv-radio'+(band==='5'?' nv-five':''),'◈',title,wifiState(group),
+            channels.push(node('nv-radio'+(band==='5'?' nv-five':''),'wifi',title,wifiState(group),
                 title+' · '+wifiSummary(group),L.url('admin/network/wireless')));
-            clients.push(node('nv-client','♧',firstNet(group).net.getActiveSSID() || title,
+            clients.push(node('nv-client','client',firstNet(group).net.getActiveSSID() || title,
                 clientSummary(group),'该频段关联'+clientSummary(group),L.url('admin/status/overview')));
         });
         if(hasLan){
-            channels.push(node('nv-radio','▤','有线 LAN',lanDev || (detected.interfaces?'未连接':'状态未知'),'有线设备数暂不可判定 · '+lanSummary,L.url('admin/network/network')));
-            clients.push(node('nv-client','▤','LAN',lan.device||lanDev||(detected.interfaces?'未连接':'状态未知'),'有线端口和设备详情请查看接口设置',L.url('admin/network/network')));
+            channels.push(node('nv-radio','lan','有线 LAN',lanDev || (detected.interfaces?'未连接':'状态未知'),'有线设备数暂不可判定 · '+lanSummary,L.url('admin/network/network')));
+            clients.push(node('nv-client','lan','LAN',lan.device||lanDev||(detected.interfaces?'未连接':'状态未知'),'有线端口和设备详情请查看接口设置',L.url('admin/network/network')));
         }
         var path=[];
         if(wan){
-            path.push(node('nv-internet'+(conn?'':' nv-inactive'),'◎',wanLabel(wan),status+(conn?' · '+(ip==='—'?getAddress(wan,true):ip):''),
+            path.push(node('nv-internet'+(conn?'':' nv-inactive'),'internet',wanLabel(wan),status+(conn?' · '+(ip==='—'?getAddress(wan,true):ip):''),
                 wanLabel(wan)+' · '+status+' · 设备 '+(wanDev||'尚未建立')+' · IPv4 '+ip+' · IPv6 '+getAddress(wan,true)+' · DNS '+((wan['dns-server']||[]).join(', ')||'—'),L.url('admin/network/network')));
             path.push(el('div','nv-wireline'+(conn?'':' nv-inactive'),[E('strong',{'data-nova':'path-download'},!detected.interfaces?'状态未知':conn?'↓ 等待采样':'未连接'),E('small',{},wanDev||wan.interface)]));
         }
-        path.push(node('nv-router','▣',board.hostname||'本地主路由',model,firmware+' · '+lanSummary,L.url('admin/status/overview')));
+        path.push(node('nv-router','router',board.hostname||'本地主路由',model,firmware+' · '+lanSummary,L.url('admin/status/overview')));
         if(channels.length){
             path.push(E('div',{'class':'nv-fork','style':'height:'+Math.max(0,(channels.length-1)*75)+'px'},[el('span','','')]));
             path.push(el('div','nv-path-channels',channels));
@@ -409,7 +448,7 @@ return view.extend({
         if(wan)pathStats.push(el('div','',[label('当前流量'),E('strong',{'data-nova':'path-flow'},!detected.interfaces?'状态未知':conn?'等待采样':'未连接'),el('small','',wanLabel(wan))]));
         var mainCard=el('section','nv-panel nv-topology',[
             el('div','nv-panel-head',[
-                el('div','nv-panel-title',[el('span','nv-head-icon','⌁'),el('strong','', '网络路径')]),
+                el('div','nv-panel-title',[el('span','nv-head-icon',icon('path')),el('strong','', '网络路径')]),
                 el('span','nv-muted','点击节点查看详情')
             ]),
             el('div','nv-path-scroll',[
@@ -436,7 +475,7 @@ return view.extend({
         ]);
         var trend=el('section','nv-panel nv-traffic',[
             el('div','nv-panel-head',[
-                el('div','nv-panel-title',[el('span','nv-head-icon','⌁'),el('strong','', '吞吐量'),el('span','nv-muted','实时采集 · WAN 接口')]),
+                el('div','nv-panel-title',[el('span','nv-head-icon',icon('activity')),el('strong','', '吞吐量'),el('span','nv-muted','实时采集 · WAN 接口')]),
                 el('div','nv-legend',[el('span','nv-legend-down','下载'),el('span','nv-legend-up','上传')])
             ]),
             el('div','nv-traffic-content',[
@@ -446,12 +485,12 @@ return view.extend({
                     E('span',{'data-nova':'traffic-up','class':'nv-upload-label'},!detected.interfaces?'—':conn?'↑ 等待采样':'—'),
                     E('small',{},['峰值 ',E('span',{'data-nova':'traffic-peak'},'—')])
                 ]),
-                E('svg',{'class':'nv-traffic-chart','viewBox':'0 0 600 150','preserveAspectRatio':'none','role':'img','aria-label':'WAN 实时上下行速率'},[
-                    E('line',{'class':'nv-gridline','x1':'0','y1':'37','x2':'600','y2':'37'}),
-                    E('line',{'class':'nv-gridline','x1':'0','y1':'76','x2':'600','y2':'76'}),
-                    E('line',{'class':'nv-gridline','x1':'0','y1':'115','x2':'600','y2':'115'}),
-                    E('polyline',{'class':'nv-line-down','data-nova':'down-path','points':'0,145 600,145'}),
-                    E('polyline',{'class':'nv-line-up','data-nova':'up-path','points':'0,145 600,145'})
+                svg('svg',{'class':'nv-traffic-chart','viewBox':'0 0 600 150','preserveAspectRatio':'none','role':'img','aria-label':'WAN 实时上下行速率'},[
+                    svg('line',{'class':'nv-gridline','x1':'0','y1':'37','x2':'600','y2':'37'}),
+                    svg('line',{'class':'nv-gridline','x1':'0','y1':'76','x2':'600','y2':'76'}),
+                    svg('line',{'class':'nv-gridline','x1':'0','y1':'115','x2':'600','y2':'115'}),
+                    svg('polyline',{'class':'nv-line-down','data-nova':'down-path','points':'0,145 600,145'}),
+                    svg('polyline',{'class':'nv-line-up','data-nova':'up-path','points':'0,145 600,145'})
                 ])
             ]),
             el('div','nv-chart-note','显示实际采样数据；尚未采样时不生成模拟曲线。')

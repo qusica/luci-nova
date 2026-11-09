@@ -37,3 +37,11 @@ test('changed browser assets bump PKG_VERSION rather than only PKG_RELEASE', {
         assert.notEqual(versions[index], version(oldMakefile), name + ' browser assets changed without a new PKG_VERSION/cache key');
     }
 });
+
+// SDK csstidy was observed replacing small-label foreground declarations with
+// an unrelated radio-meter background. Never re-enable it without fixing the
+// optimizer and verifying the complete generated CSS.
+test('package CSS preserves reviewed source rather than unsafe csstidy rewrites', () => {
+    for (const name of packages)
+        assert.match(fs.readFileSync(path.join(root, name, 'Makefile'), 'utf8'), /^LUCI_MINIFY_CSS:=0$/m);
+});
