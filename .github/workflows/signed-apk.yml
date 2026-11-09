@@ -35,7 +35,7 @@ jobs:
           node --check luci-theme-nova/htdocs/luci-static/nova/nova-shell.js
           node --check luci-theme-nova/htdocs/luci-static/nova/nova-lists.js
       - name: Test dashboard rendering
-        run: node --test tests/dashboard.test.js tests/native-lists.test.js tests/navigation.test.js tests/menu-localization.test.js
+        run: node --test tests/dashboard.test.js tests/native-lists.test.js tests/navigation.test.js tests/menu-localization.test.js tests/package-independence.test.js
       - name: Test asset cache versions
         env:
           NOVA_ASSET_BASE: ${{ github.event.before }}
@@ -53,6 +53,22 @@ jobs:
           FEEDNAME: nova
           PACKAGES: luci-theme-nova luci-app-nova-dashboard
           BUILD_LOG: 1
+      - name: Install APK validation tool dependencies without signing credentials
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends build-essential meson ninja-build pkg-config libssl-dev zlib1g-dev libzstd-dev
+      - name: Build pinned APK validation tool
+        run: bash scripts/build-host-apk.sh "$RUNNER_TEMP/nova-host-apk"
+      - name: Validate actual package assets before signing
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -d '' themes < <(find bin/packages -type f -name 'luci-theme-nova-*.apk' -print0)
+          mapfile -d '' dashboards < <(find bin/packages -type f -name 'luci-app-nova-dashboard-*.apk' -print0)
+          test "${#themes[@]}" -eq 1
+          test "${#dashboards[@]}" -eq 1
+          bash scripts/test-built-apks.sh "$RUNNER_TEMP/nova-host-apk/build/src/apk" \
+            "${themes[0]}" "${dashboards[0]}" "$RUNNER_TEMP/nova-built-assets-test"
       - name: Upload intermediate packages for this run
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:

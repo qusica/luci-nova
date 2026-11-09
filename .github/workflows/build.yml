@@ -1,5 +1,7 @@
-name: Build APK
+name: Build APK and IPK
 on:
+  push:
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
@@ -13,7 +15,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # IPK builds are paused until feature development is complete.
+          - series: '24.10'
+            sdk: '24.10.8'
+            arch: 'x86_64'
+            ext: ipk
+            package_separator: '_'
           - series: '25.12'
             sdk: '25.12.6'
             arch: 'x86_64'
@@ -41,12 +47,22 @@ jobs:
       - name: Test click-only menu interactions in Chrome
         run: node --test tests/navigation-browser.test.js
       - name: Build from matching OpenWrt SDK
-        uses: openwrt/gh-action-sdk@main
+        uses: openwrt/gh-action-sdk@f5813d30eeef3534b58ac7e79c5d8842b6035434
         env:
           ARCH: ${{ matrix.arch }}-${{ matrix.sdk }}
           FEEDNAME: nova
           PACKAGES: luci-theme-nova luci-app-nova-dashboard
           BUILD_LOG: 1
+      - name: Test actual built IPK assets and metadata
+        if: matrix.ext == 'ipk'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -d '' themes < <(find bin/packages -type f -name 'luci-theme-nova_*.ipk' -print0)
+          mapfile -d '' dashboards < <(find bin/packages -type f -name 'luci-app-nova-dashboard_*.ipk' -print0)
+          test "${#themes[@]}" -eq 1
+          test "${#dashboards[@]}" -eq 1
+          bash scripts/test-built-ipks.sh "${themes[0]}" "${dashboards[0]}" "$RUNNER_TEMP/nova-built-ipk-assets-test"
       - name: Install host APK build dependencies (test only)
         if: matrix.ext == 'apk'
         run: |
@@ -77,6 +93,17 @@ jobs:
           test "${#dashboards[@]}" -eq 1
           bash scripts/test-apk-signing.sh "$RUNNER_TEMP/nova-host-apk/build/src/apk" \
             "${themes[0]}" "${dashboards[0]}" "$RUNNER_TEMP/nova-test-signed"
+      - name: Record source and package checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p package-provenance
+          printf 'repository=%s\ncommit=%s\nref=%s\nsdk=%s\nformat=%s\nrun=%s/%s/actions/runs/%s\n' \
+            "$GITHUB_REPOSITORY" "$GITHUB_SHA" "$GITHUB_REF" "${{ matrix.sdk }}" "${{ matrix.ext }}" \
+            "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" > package-provenance/BUILD-SOURCE.txt
+          find bin/packages -type f \( -name 'luci-theme-nova${{ matrix.package_separator }}*.${{ matrix.ext }}' -o \
+            -name 'luci-app-nova-dashboard${{ matrix.package_separator }}*.${{ matrix.ext }}' \) -print0 | \
+            sort -z | xargs -0 sha256sum > package-provenance/SHA256SUMS
       - name: Upload built ${{ matrix.ext }} packages
         uses: actions/upload-artifact@v4
         with:
@@ -84,6 +111,7 @@ jobs:
           path: |
             bin/packages/**/luci-theme-nova${{ matrix.package_separator }}*.${{ matrix.ext }}
             bin/packages/**/luci-app-nova-dashboard${{ matrix.package_separator }}*.${{ matrix.ext }}
+            package-provenance/
           if-no-files-found: error
       - name: Upload TEST ONLY signed APKs and disposable public key
         if: matrix.ext == 'apk'
