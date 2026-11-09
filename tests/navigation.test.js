@@ -48,7 +48,7 @@ function harness(routes) {
         createElementNS: (namespace, name) => { assert.equal(namespace, 'http://www.w3.org/2000/svg'); return new Element(name); },
         addEventListener() {} };
     class MutationObserver { constructor(callback) { update = callback; } observe() {} }
-    vm.runInNewContext(source, { document, window: { MutationObserver }, MutationObserver, URL });
+    vm.runInNewContext(source, { document, window: { MutationObserver, addEventListener() {} }, MutationObserver, URL });
     return { menu, update, links: () => menu.children.map(item => item.children[0]) };
 }
 

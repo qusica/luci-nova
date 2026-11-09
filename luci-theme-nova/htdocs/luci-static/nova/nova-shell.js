@@ -70,6 +70,15 @@
     function setExpanded(link, expanded) {
       link.parentElement.classList.toggle('open', expanded);
       link.setAttribute('aria-expanded', String(expanded));
+      var submenu = link.parentElement.querySelector(':scope > .dropdown-menu');
+      submenu.style.marginLeft = '';
+      // Mobile categories can sit near the right edge or wrap onto a new row.
+      // Keep their popout inside the usable viewport, including its scrollbar.
+      if (expanded && window.getComputedStyle(submenu).position === 'absolute') {
+        var bounds = submenu.getBoundingClientRect();
+        var shift = Math.max(8 - bounds.left, Math.min(0, document.documentElement.clientWidth - 8 - bounds.right));
+        submenu.style.marginLeft = shift + 'px';
+      }
     }
     function closeMenus() {
       if (!menu) return;
@@ -154,6 +163,7 @@
     if (menu && window.MutationObserver) {
       new MutationObserver(update).observe(menu, {childList:true,subtree:true});
     }
+    window.addEventListener('resize', update);
     update();
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);

@@ -89,6 +89,11 @@ test('sidebar has no phantom scrollbar and long menus remain reachable', { timeo
             assert.ok(state.brand.left === 0 && state.brand.right === state.clientWidth, 'brand fills sidebar without padding overflow');
             assert.ok(state.footer.bottom <= state.clientHeight, 'footer fits');
             assert.equal(state.overflowY, 'auto', 'genuine vertical overflow remains scrollable');
+            // Prove this fixture catches the exact old defect before restoring it.
+            await evaluate(`document.querySelector('header .brand').style.marginRight='0px'`);
+            assert.equal((await geometry()).scrollWidth - state.clientWidth, 8, 'old one-sided margin reproduces the empty scrollbar');
+            await evaluate(`document.querySelector('header .brand').style.marginRight=''`);
+            noHorizontal(await geometry(), `${width} restored`);
         }
         // Actual wheel and keyboard input must reach entries below a short screen.
         await load(1180, 320);
@@ -126,6 +131,14 @@ test('sidebar has no phantom scrollbar and long menus remain reachable', { timeo
             noHorizontal(state, `${width} mobile expanded`);
             assert.equal(await evaluate('getComputedStyle(document.querySelector("#status>.dropdown-menu")).display'), 'block');
             await key('Escape', 'Escape', 27);
+        }
+        await load(768, 757);
+        await click('status-toggle');
+        for (const width of [320, 1440, 390]) {
+            await send('Emulation.setDeviceMetricsOverride', { width, height: 757, deviceScaleFactor: 1, mobile: false, screenWidth: width, screenHeight: 757 });
+            await settle();
+            noHorizontal(await geometry(), `${width} resized while open`);
+            assert.equal(await evaluate('getComputedStyle(document.querySelector("#status>.dropdown-menu")).display'), 'block');
         }
     } finally {
         await browser.close();
