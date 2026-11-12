@@ -56,7 +56,6 @@
     link.setAttribute('data-nova-icon', name);
   }
   function boot() {
-    var search = document.getElementById('nova-search');
     var refresh = document.getElementById('nova-refresh');
     var menu = document.getElementById('topmenu');
     if (refresh) refresh.addEventListener('click', function() { window.location.reload(); });
@@ -88,14 +87,9 @@
     }
     function update() {
       if (!menu) return;
-      var q = search ? search.value.trim().toLowerCase() : '';
       var items = menu.querySelectorAll(':scope > li');
       for (var i=0; i<items.length; i++) {
         decorateLink(items[i]);
-        var text = (items[i].textContent || '').toLowerCase();
-        items[i].style.display = (!q || text.indexOf(q) >= 0) ? '' : 'none';
-        if (q && text.indexOf(q) >= 0) items[i].classList.add('nova-search-result');
-        else items[i].classList.remove('nova-search-result');
         var link = toggleFor(items[i].querySelector(':scope > a'));
         if (link) {
           var submenu = items[i].querySelector(':scope > .dropdown-menu');
@@ -144,19 +138,6 @@
       });
       document.addEventListener('click', function(e) {
         if (!menu.contains(e.target)) closeMenus();
-      });
-    }
-    if (search) {
-      search.addEventListener('input', update);
-      document.addEventListener('keydown', function(e) {
-        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
-          e.preventDefault();
-          search.focus();
-          search.select();
-        }
-        if (e.key === 'Escape' && document.activeElement === search) {
-          search.value = ''; update(); search.blur();
-        }
       });
     }
     // Menu is inserted asynchronously by LuCI.

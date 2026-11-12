@@ -248,8 +248,8 @@ test('click-only LuCI navigation handles real hover, keyboard and touch', { time
         assert.equal(await evaluate('document.getElementById("custom").textContent'), 'A long custom plugin name that wraps without hiding its icon', 'SVG polluted accessible label');
         assert.ok(await evaluate(`(()=>{const a=document.getElementById('custom'),r=a.getBoundingClientRect(),icon=a.querySelector('svg').getBoundingClientRect();return icon.width===20 && icon.left>=r.left && icon.right<r.right && a.scrollWidth<=a.clientWidth})()`), 'long category label overflows or squashes its icon');
         await evaluate(`(()=>{const s=document.getElementById('nova-search');s.value='网络';s.dispatchEvent(new Event('input',{bubbles:true}))})()`);
-        assert.equal(await evaluate('document.getElementById("network").style.display'), '', 'localized menu search stopped working');
-        assert.equal(await evaluate('document.getElementById("system").style.display'), 'none', 'search does not filter unrelated menu');
+        assert.equal(await evaluate('document.getElementById("network").style.display'), '', 'page search must leave matching native menu groups visible');
+        assert.equal(await evaluate('document.getElementById("system").style.display'), '', 'page search must not hide native menu groups');
         await load(528, true);
         await tap('network-toggle');
         await state([false, false, true]);

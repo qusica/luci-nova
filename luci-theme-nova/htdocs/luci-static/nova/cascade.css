@@ -75,7 +75,7 @@ header .brand:hover{color:#fff;text-decoration:none}
  text-indent:0;transform:rotate(45deg);pointer-events:none}
 #topmenu>li>a.menu[aria-expanded="true"]::after{margin-top:-1px;transform:rotate(225deg)}
 #topmenu>li.active>a,#topmenu>li>a:hover,
-#topmenu>li.dropdown.open>a,#topmenu>li.nova-search-result>a:focus{
+#topmenu>li.dropdown.open>a{
  color:var(--nova-accent-hover);background:var(--nova-accent-soft);
 }
 #topmenu .dropdown-menu{
@@ -306,3 +306,27 @@ footer{font-size:11px;line-height:1.6}
  #topmenu .dropdown-menu{left:0}
 }
 @media(prefers-reduced-motion:reduce){*{animation-duration:.001ms!important;transition-duration:.001ms!important}}
+
+/* Page search is a separate result list, never a filter on native navigation. */
+.nova-page-search{position:relative;min-width:0}
+.nova-page-search .nova-search-wrap{margin:0}
+.nova-search-panel{position:absolute;z-index:130;right:0;top:calc(100% + 8px);
+ width:min(440px,calc(100vw - 24px));max-height:min(65vh,520px);overflow-y:auto;
+ box-sizing:border-box;padding:6px;border:1px solid var(--nova-border);border-radius:10px;
+ background:var(--nova-surface);box-shadow:0 12px 32px #0005;color:var(--nova-text)}
+.nova-search-panel[hidden],#nova-search-results[hidden]{display:none!important}
+.nova-search-hint,.nova-search-status{padding:6px 9px;font-size:11px;line-height:1.5;color:var(--nova-muted)}
+.nova-search-hint{border-bottom:1px solid var(--nova-border-soft)}
+#nova-search-results>a{display:block;box-sizing:border-box;padding:9px;border-radius:6px;
+ text-decoration:none;white-space:normal;overflow-wrap:anywhere;color:var(--nova-text);line-height:1.5}
+#nova-search-results>a:hover,#nova-search-results>a[aria-selected="true"]{background:var(--nova-accent-soft);color:var(--nova-accent-hover)}
+.nova-search-title{display:block;font-size:13px;font-weight:600}
+.nova-search-path{display:block;margin-top:2px;font-size:11px;color:var(--nova-muted)}
+@media(max-width:640px){
+ .nova-page-search{flex:1 1 160px;min-width:125px}
+ .nova-page-search .nova-search-wrap{width:100%}
+ .nova-search-panel{left:0;right:auto}
+}
+@media(forced-colors:active){
+ #nova-search-results>a[aria-selected="true"]{outline:2px solid Highlight;outline-offset:-2px}
+}

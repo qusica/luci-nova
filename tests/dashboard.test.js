@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
 
-const resources = path.resolve(__dirname, '../luci-app-nova-dashboard/htdocs/luci-static/resources');
+const resources = path.resolve(__dirname, '../luci-theme-nova/htdocs/luci-static/resources');
 const source = fs.readFileSync(path.join(resources, 'view/nova/dashboard.js'), 'utf8');
 const hasClass = name => node => (node.attrs.class || '').split(' ').includes(name);
 function all(node, predicate) {
@@ -17,12 +17,13 @@ function text(node) {
 }
 
 // Dependency-free DOM/RPC doubles. The browser suite exercises real layout.
-function harness() {
-    const polls = new Set(), calls = [], declarations = {};
+function harness(options={}) {
+    const polls = new Set(), calls = [], declarations = {}, intervals = new Map(), listeners = new Map();
+    const storage = new Map(Object.entries(options.storage || {}));
     let active;
     function E(tag, attrs = {}, children = []) {
         const element = {
-            tag, attrs, namespaceURI: 'http://www.w3.org/1999/xhtml', hidden: !!attrs.hidden, parent: null, children: [],
+            tag, attrs, checked:!!attrs.checked, open:!!attrs.open, value:attrs.value || '', namespaceURI: 'http://www.w3.org/1999/xhtml', hidden: !!attrs.hidden, parent: null, children: [],
             get isConnected() { return this.tag === 'body' || this.tag === 'head' || !!(this.parent && this.parent.isConnected); },
             get nextSibling() { return this.parent && this.parent.children[this.parent.children.indexOf(this)+1]; },
             get textContent() { return text(this); },
@@ -43,6 +44,7 @@ function harness() {
             },
             querySelectorAll(selector) {
                 return all(this, node => {
+                    if (selector === 'input') return node.tag === 'input';
                     if (selector === '.nv-node:focus') return hasClass('nv-node')(node) && node === active;
                     if (selector.startsWith('.')) return hasClass(selector.slice(1))(node);
                     const match = selector.match(/^\[data-nova=(.+)\]$/);
@@ -57,7 +59,11 @@ function harness() {
         return element;
     }
     const document = {
-        head: E('head'), body: E('body'),
+        head: E('head'), body: E('body'), hidden:false,
+        defaultView:{localStorage:{getItem:key=>{if(options.storageError)throw Error('denied');return storage.get(key);},setItem:(key,value)=>{if(options.storageError)throw Error('denied');storage.set(key,value);}}},
+        addEventListener:(type,fn)=>{if(!listeners.has(type))listeners.set(type,new Set());listeners.get(type).add(fn);},
+        removeEventListener:(type,fn)=>listeners.get(type)?.delete(fn),
+        dispatchEvent:event=>{for(const fn of listeners.get(event.type)||[])fn(event);},
         getElementById: id => all(document.body, n => n.attrs.id === id).concat(all(document.head, n => n.attrs.id === id))[0],
         createTextNode: text => String(text),
         createElementNS: (namespace, tag) => {
@@ -75,6 +81,18 @@ function harness() {
         'luci.getRealtimeStats': [[1,100,0,50],[4,400,0,200]]
     };
     let cpu = 100;
+    // Execute the unchanged upstream Poll singleton, including synchronous
+    // add -> start -> step dispatch. Only its one-second clock is controlled.
+    let nativePoll, timer, timerId = 0;
+    if (options.nativePoll) {
+        nativePoll = new Function('Class', 'env', 'window', 'document', 'CustomEvent',
+            fs.readFileSync(path.join(__dirname, 'fixtures/luci-poll-' + options.nativePoll + '.js'), 'utf8') + '\nreturn Poll;')(
+            {singleton: value => value}, {}, {
+                setInterval: fn => { timer = fn; return ++timerId; },
+                clearInterval: () => { timer = null; }
+            }, document, class { constructor(type) { this.type = type; } });
+        nativePoll.start(); // LuCI initializes the idle scheduler before views.
+    }
     const view = new Function('view','rpc','poll','fs','E','L','document',source)(
         {extend:value=>value}, {declare: options => {
             const key = options.object+'.'+options.method; declarations[key] = options;
@@ -83,12 +101,22 @@ function harness() {
                 const value=responses[key];
                 return value instanceof Error ? Promise.reject(value) : Promise.resolve(typeof value === 'function' ? value(...args) : structuredClone(value));
             };
-        }}, {add:fn=>polls.add(fn),remove:fn=>polls.delete(fn)},
+        }}, nativePoll || {add:(fn,seconds)=>{polls.add(fn);intervals.set(fn,seconds);},remove:fn=>{polls.delete(fn);intervals.delete(fn);}},
         {read: file => Promise.resolve(file === '/proc/stat' ? `cpu ${cpu+=50} 0 0 ${cpu*2}` : null)}, E,
         {url:x=>'/cgi-bin/luci/'+x,resource:x=>'/luci-static/resources/'+x},document
     );
     const app = {
-        view, document, polls, responses, calls, declarations,
+        view, document, polls, responses, calls, declarations, storage, listeners, intervals, nativePoll,
+        async settle() {
+            // A rebuild removes the old entry while its promise is still
+            // finishing, so drain those reactions as well as current entries.
+            for (let i=0; i<100; i++) await Promise.resolve();
+            assert.ok(!nativePoll.queue.some(entry => !entry.r),'native poll did not settle');
+        },
+        async advance(seconds) {
+            for (let i=0; i<seconds; i++) { if (timer) timer(); await app.settle(); }
+        },
+        tick() { if(timer)timer(); },
         get root() { return document.body.children[0]; },
         get active() { return active; },
         async render(interfaces=[], wireless={}) {
@@ -97,7 +125,13 @@ function harness() {
             responses['luci-rpc.getWirelessDevices']=wireless;
             return app.mount();
         },
-        async mount() { const data=await view.load(); document.body.replaceChildren(view.render(data)); return app.root; },
+        async mount() {
+            // Match LuCI View: load -> render -> DOM.content in distinct
+            // promise reactions, with the root disconnected during render.
+            await Promise.resolve().then(() => view.load()).then(data => view.render(data))
+                .then(root => document.body.replaceChildren(root));
+            return app.root;
+        },
         async poll() { assert.equal(polls.size,1); await [...polls][0](); return app.root; }
     };
     return app;
@@ -435,11 +469,11 @@ test('read-only ACL covers strict inventories and no router configuration writes
 
 test('versioned stylesheet is upgraded once; render and remove maintain one poll',async()=>{
     const app=harness();await app.render();assert.equal(app.polls.size,1);
-    const style=app.document.head.children[0];assert.equal(style.attrs.href,'/luci-static/resources/nova/dashboard.css?v=0.2.12');
+    const style=app.document.head.children[0];assert.equal(style.attrs.href,'/luci-static/resources/nova/dashboard.css?v=0.3.1');
     assert.ok(fs.statSync(path.join(resources,'nova/dashboard.css')).size>0);
     for(const old of ['','?v=0.2.2']){
         app.view.remove();style.attrs.href='/luci-static/resources/nova/dashboard.css'+old;
-        await app.render();assert.equal(app.document.head.children.length,1);assert.match(style.attrs.href,/\?v=0\.2\.12$/);assert.equal(app.polls.size,1);
+        await app.render();assert.equal(app.document.head.children.length,1);assert.match(style.attrs.href,/\?v=0\.3\.1$/);assert.equal(app.polls.size,1);
     }
     app.view.remove();assert.equal(app.polls.size,0);
 });
@@ -484,3 +518,194 @@ test('LuCI-faithful DOM creates all chart roots and shapes in SVG namespace', as
     await [...app.polls][0]();
     assert.notEqual(all(app.root, n => n.attrs['data-nova'] === 'down-path')[0].attrs.points, '0,145 600,145');
 });
+
+const preferenceKey = 'nova.dashboard.preferences.v1';
+const findOption = (app,key) => all(app.root,n=>n.attrs['data-nova-card-option']===key)[0];
+const findCard = (app,key) => all(app.root,n=>n.attrs['data-nova-card']===key)[0];
+function changeOption(app,key,checked){const option=findOption(app,key);option.checked=checked;option.attrs.change({target:option});}
+function setIntervalOption(app,value){app.document.getElementById('nv-refresh-interval').attrs.change({target:{value:String(value)}});}
+
+test('browser card preferences default visible, persist and reset even after all cards hidden',async()=>{
+    const app=harness();await app.render([wanUp],{radio0:radio()});
+    assert.equal([...app.intervals.values()][0],10);
+    for(const key of ['cpu','memory','disk','topology','traffic','band-24'])assert.equal(findCard(app,key).hidden,false);
+    for(const option of all(app.root,n=>n.tag==='input'))changeOption(app,option.attrs['data-nova-card-option'],false);
+    assert.equal(app.polls.size,0);assert.equal(all(app.root,hasClass('nv-empty'))[0].hidden,false);
+    const saved=JSON.parse(app.storage.get(preferenceKey));assert.ok(saved.hidden.includes('cpu'));
+    const restored=harness({storage:{[preferenceKey]:JSON.stringify(saved)}});await restored.render([wanUp],{radio0:radio()});
+    assert.equal(findCard(restored,'cpu').hidden,true);assert.equal(restored.polls.size,0);
+    all(restored.root,hasClass('nv-reset'))[0].click();
+    assert.equal(restored.polls.size,1);assert.equal([...restored.intervals.values()][0],10);
+    assert.ok(all(restored.root,n=>n.tag==='input').every(n=>n.checked));assert.equal(findCard(restored,'cpu').hidden,false);
+});
+
+for(const raw of ['{broken','x'.repeat(2049),'null','{"interval":1,"hidden":["cpu","cpu","bogus",{},"__proto__"]}'])test('invalid preferences bounded and filtered: '+raw.slice(0,30),async()=>{
+    const app=harness({storage:{[preferenceKey]:raw}});await app.render();
+    assert.equal([...app.intervals.values()][0],10);
+    assert.equal(findCard(app,'cpu').hidden,raw.includes('"cpu"'));
+    assert.ok(app.view._novaPreferences.hidden.length<=1);
+});
+
+test('storage denial leaves controls functional and reports session-only preferences',async()=>{
+    const app=harness({storageError:true});await app.render();changeOption(app,'cpu',false);
+    assert.equal(findCard(app,'cpu').hidden,true);assert.match(text(app.root),/偏好仅在本次页面有效/);
+});
+
+test('pause, visibility and teardown remove polling and listeners without duplicating it',async()=>{
+    const app=harness();await app.render();const update=[...app.polls][0];
+    setIntervalOption(app,30);assert.deepEqual([...app.intervals.values()],[30]);
+    setIntervalOption(app,0);assert.equal(app.polls.size,0);
+    app.calls.length=0;await update();assert.equal(app.calls.length,0);
+    setIntervalOption(app,60);assert.deepEqual([...app.intervals.values()],[60]);
+    app.document.hidden=true;app.document.dispatchEvent({type:'visibilitychange'});assert.equal(app.polls.size,0);
+    await update();assert.equal(app.calls.length,0);
+    app.document.hidden=false;app.document.dispatchEvent({type:'visibilitychange'});assert.equal(app.polls.size,1);
+    app.document.dispatchEvent({type:'visibilitychange'});assert.equal(app.polls.size,1);
+    app.view.remove();assert.equal(app.polls.size,0);assert.equal(app.listeners.get('visibilitychange').size,0);
+    app.document.dispatchEvent({type:'visibilitychange'});assert.equal(app.polls.size,0);
+});
+
+test('pause and resume invalidate in-flight detection without starting concurrent reads',async()=>{
+    const app=harness();await app.render([wanUp]);const original=app.root;let resolve;
+    app.responses['network.interface.dump']=()=>new Promise(r=>resolve=r);
+    const pending=app.poll();await Promise.resolve();
+    setIntervalOption(app,0);setIntervalOption(app,10);const count=app.calls.length;await app.poll();assert.equal(app.calls.length,count);
+    resolve({interface:[]});await pending;assert.equal(app.root,original);assert.ok(findCard(app,'traffic'));
+    app.responses['network.interface.dump']={interface:[]};await app.poll();assert.equal(findCard(app,'traffic'),undefined);
+});
+
+test('hidden WAN and band cards do not request their realtime samples',async()=>{
+    const app=harness();await app.render([wanUp],{radio0:radio()});
+    for(const key of ['rate-down','traffic','topology','band-24'])changeOption(app,key,false);
+    app.calls.length=0;await app.poll();assert.ok(!app.calls.some(c=>c[0]==='luci.getRealtimeStats'));
+    changeOption(app,'traffic',true);app.calls.length=0;await app.poll();assert.equal(app.calls.filter(c=>c[0]==='luci.getRealtimeStats').length,1);
+});
+
+test('expanded details and card visibility survive inventory replacement',async()=>{
+    const app=harness();await app.render([wanUp],{radio0:radio()});
+    const details=all(app.root,n=>n.tag==='details');assert.equal(details[1].open,true);assert.equal(details[2].open,false);
+    details[0].open=true;details[2].open=true;changeOption(app,'cpu',false);
+    app.responses['network.interface.dump']={interface:[{...wanUp,'ipv4-address':[{address:'203.0.113.99'}]}]};await app.poll();
+    assert.equal(findCard(app,'cpu').hidden,true);assert.ok(all(app.root,n=>n.tag==='details').every(n=>n.open));
+    assert.equal(app.listeners.get('visibilitychange').size,1);
+});
+
+test('failed system telemetry replaces old values with unavailable rather than silently retaining them',async()=>{
+    const app=harness();await app.render([wanUp]);await app.poll();
+    app.responses['system.info']=new Error('offline');app.responses['luci.getRealtimeStats']=new Error('offline');await app.poll();
+    assert.equal(app.root.querySelector('[data-nova=memory]').textContent,'不可用');
+    assert.equal(app.root.querySelector('[data-nova=disk]').textContent,'不可用');
+    assert.equal(app.root.querySelector('[data-nova=rate-down]').textContent,'采样不可用');
+    assert.match(text(app.root.querySelector('.nv-updated')),/部分数据不可用/);
+});
+
+
+test('late rate samples after pause are discarded, then fresh polling recovers',async()=>{
+    const app=harness();await app.render([wanUp]);await app.poll();
+    let resolve;app.responses['luci.getRealtimeStats']=()=>new Promise(r=>resolve=r);
+    const pending=app.poll();for(let i=0;i<30 && !resolve;i++)await Promise.resolve();assert.ok(resolve);
+    const prior=app.root.querySelector('[data-nova=rate-down]').textContent;
+    setIntervalOption(app,0);resolve([[1,0,0,0],[4,999999,0,0]]);await pending;
+    assert.equal(app.root.querySelector('[data-nova=rate-down]').textContent,prior);assert.match(text(app.root.querySelector('.nv-updated')),/已暂停/);
+    setIntervalOption(app,10);app.responses['luci.getRealtimeStats']=[[1,0,0,0],[4,0,0,0]];await app.poll();
+    assert.equal(app.root.querySelector('[data-nova=rate-down]').textContent,'↓ 0 bit/s');
+});
+
+test('a detached dashboard removes its scheduler on the next poll',async()=>{
+    const app=harness();await app.render();app.document.body.replaceChildren();await app.poll();
+    assert.equal(app.polls.size,0);assert.equal(app.listeners.get('visibilitychange').size,0);
+});
+
+for(const series of ['24.10','25.12']) {
+test('native LuCI '+series+' synchronous first tick survives initial mount, rebuild, pause and navigation',async()=>{
+    const app=harness({nativePoll:series});
+    await app.render([wanUp]);
+    assert.equal(app.nativePoll.queue.length,1,'render must retain the callback after synchronous first tick');
+    assert.equal(typeof app.view._novaPoll,'function');
+    assert.equal(app.nativePoll.active(),true);
+    assert.equal(app.calls.filter(call=>call[0]==='luci.getRealtimeStats').length,0,'no sampling before DOM mount');
+    await app.advance(10);
+    assert.match(app.root.querySelector('[data-nova=rate-down]').textContent,/bit\/s/);
+    assert.match(app.root.querySelector('[data-nova=cpu]').textContent,/%/);
+    const original=app.root;
+    app.responses['network.interface.dump']={interface:[{...wanUp,'ipv4-address':[{address:'203.0.113.9'}]}]};
+    await app.advance(10);
+    assert.notEqual(app.root,original,'inventory change replaces the root');
+    assert.equal(app.nativePoll.queue.length,1,'replacement keeps exactly one callback');
+    assert.equal(typeof app.view._novaSampleRates,'function');
+    assert.match(app.root.querySelector('[data-nova=rate-down]').textContent,/bit\/s/);
+    for(let i=0;i<3;i++){
+        setIntervalOption(app,0);
+        assert.equal(app.nativePoll.queue.length,0);
+        assert.equal(app.nativePoll.active(),false);
+        const count=app.calls.length;
+        setIntervalOption(app,10);
+        assert.ok(app.calls.length>count,'resume dispatches native synchronous first tick');
+        await app.settle();
+        assert.equal(app.nativePoll.queue.length,1);
+        assert.match(app.root.querySelector('.nv-updated').textContent,/已刷新/);
+        await app.advance(10);
+        assert.match(app.root.querySelector('[data-nova=cpu]').textContent,/%/);
+    }
+    app.document.hidden=true;app.document.dispatchEvent({type:'visibilitychange'});
+    assert.equal(app.nativePoll.active(),false);
+    app.document.hidden=false;app.document.dispatchEvent({type:'visibilitychange'});
+    await app.settle();
+    assert.equal(app.nativePoll.queue.length,1);
+    for(const seconds of [30,60,10]){
+        setIntervalOption(app,seconds);await app.settle();
+        assert.deepEqual(app.nativePoll.queue.map(entry=>entry.i),[seconds]);
+        const count=app.calls.length;
+        await app.advance(seconds-1);assert.equal(app.calls.length,count,'respect configured interval');
+        await app.advance(1);assert.ok(app.calls.length>count);
+    }
+    for(const input of all(app.root,node=>node.tag==='input')){
+        input.checked=false;input.attrs.change({target:input});await app.settle();
+    }
+    assert.equal(app.nativePoll.queue.length,0);
+    app.root.querySelector('.nv-reset').click();await app.settle();
+    assert.equal(app.nativePoll.queue.length,1);
+    assert.match(app.root.querySelector('.nv-updated').textContent,/已刷新/);
+    app.document.body.replaceChildren();
+    await app.advance(10);
+    assert.equal(app.nativePoll.queue.length,0,'detached mounted root still tears down');
+    assert.equal(app.view._novaPoll,null);
+    assert.equal(app.listeners.get('visibilitychange').size,0);
+});
+
+test('native LuCI '+series+' polling also works while another page poll is already running',async()=>{
+    const app=harness({nativePoll:series});
+    const other=()=>Promise.resolve();app.nativePoll.add(other,5);
+    await app.render([wanUp]);await app.advance(10);
+    assert.equal(app.nativePoll.queue.length,2);
+    assert.match(app.root.querySelector('[data-nova=rate-down]').textContent,/bit\/s/);
+    app.view.remove();
+    assert.deepEqual(app.nativePoll.queue.map(entry=>entry.fn),[other]);
+    app.nativePoll.remove(other);
+});
+
+test('native LuCI '+series+' discards an unmounted render without retaining its scheduler',async()=>{
+    const app=harness({nativePoll:series});
+    app.view.render(await app.view.load());
+    assert.equal(app.nativePoll.queue.length,1,'registration survives the synchronous tick');
+    await app.advance(10);
+    assert.equal(app.nativePoll.queue.length,0,'abandoned unmounted root is cleaned on a later tick');
+    assert.equal(app.listeners.get('visibilitychange').size,0);
+});
+
+test('native LuCI '+series+' restart during pending detection drops stale data and recovers',async()=>{
+    const app=harness({nativePoll:series});await app.render([wanUp]);await app.advance(10);
+    let resolve;app.responses['network.interface.dump']=()=>new Promise(r=>resolve=r);
+    await app.advance(9);app.tick();assert.equal(typeof resolve,'function');
+    setIntervalOption(app,0);setIntervalOption(app,10);
+    assert.equal(app.nativePoll.queue.length,1);
+    const root=app.root;
+    resolve({interface:[]});await app.settle();
+    assert.equal(app.root,root,'stale inventory cannot rebuild the current dashboard');
+    app.responses['network.interface.dump']={interface:[wanUp]};
+    await app.advance(10);
+    assert.match(app.root.querySelector('.nv-updated').textContent,/已刷新/);
+    assert.equal(app.nativePoll.queue.length,1);
+    app.view.remove();assert.equal(app.nativePoll.queue.length,0);
+});
+}

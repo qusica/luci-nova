@@ -1,16 +1,15 @@
 #!/usr/bin/env bash
 # Validate OpenWrt 24.10 IPKs as data only. Never install or execute package hooks.
 set -euo pipefail
-[[ $# -eq 3 ]] || { echo 'Usage: test-built-ipks.sh THEME.ipk DASHBOARD.ipk NEW_STAGE' >&2; exit 2; }
+[[ $# -eq 2 ]] || { echo 'Usage: test-built-ipks.sh THEME.ipk NEW_STAGE' >&2; exit 2; }
 theme=$(realpath "$1")
-dashboard=$(realpath "$2")
-stage=$3
+stage=$2
 base=$(cd "$(dirname "$0")/.." && pwd)
-[[ -f $theme && -f $dashboard ]]
+[[ -f $theme ]]
 [[ ! -e $stage && ! -L $stage ]]
 mkdir -p "$stage"
 stage=$(realpath "$stage")
-python3 - "$base" "$stage" "$theme" "$dashboard" <<'PY'
+python3 - "$base" "$stage" "$theme" <<'PY'
 import io
 import pathlib
 import re
@@ -34,7 +33,7 @@ def safe_name(name):
 
 def tar_entries(blob):
     # Reject links (including hard links), devices and duplicates before writing.
-    # These two architecture-independent packages need only files/directories.
+    # This architecture-independent package needs only files/directories.
     entries = {}
     total = 0
     with tarfile.open(fileobj=io.BytesIO(blob), mode='r:*') as archive:
@@ -84,8 +83,7 @@ def unpack(entries, destination):
                 output.write(data)
 
 
-names = ('luci-theme-nova', 'luci-app-nova-dashboard')
-versions = []
+names = ('luci-theme-nova',)
 for file, name in zip(packages, names):
     outer = ipk_entries(file)
     require(set(outer) - {'.'} == {'debian-binary', 'control.tar.gz', 'data.tar.gz'},
@@ -112,32 +110,34 @@ for file, name in zip(packages, names):
     require(dependencies <= required | {'libc'}, f'{name}: unexpected dependencies {dependencies - required - {"libc"}}')
     require(required <= dependencies, f'{name}: missing required dependencies {required - dependencies}')
     require(not dependencies.intersection(names), f'{name}: unexpected Nova package dependency')
-    versions.append(expected)
-    # Keep separate roots so one package cannot hide missing assets in the other.
+    require(metadata.get('Conflicts') == 'luci-app-nova-dashboard', f'{name}: missing legacy dashboard conflict')
+    require(not metadata.get('Replaces'), f'{name}: must not force replacement of the old dashboard')
+    # Tests read only this single package, so missing dashboard assets cannot hide.
     root = stage / name / 'root'
     unpack(tar_entries(outer['data.tar.gz']), root)
     require((root / 'www').is_dir(), f'{name}: missing www payload')
     (stage / name / 'htdocs').symlink_to(root / 'www', target_is_directory=True)
     unpack(control, stage / 'control' / name)
     print(f'IPK metadata verified: {name} {expected} all; dependencies: {sorted(dependencies)}')
-require(len(set(versions)) == 1, 'Theme/dashboard versions do not match')
+
 PY
 cp -R "$base/tests" "$stage/tests"
 # Preserve exact CSS bytes: SDK csstidy can silently corrupt merged rules.
-for package in luci-theme-nova luci-app-nova-dashboard; do
+for package in luci-theme-nova; do
     while IFS= read -r -d '' source; do
         relative=${source#"$base/$package/htdocs/"}
         cmp "$source" "$stage/$package/htdocs/$relative"
         printf 'CSS payload matches source: %s\n' "$package/$relative"
     done < <(find "$base/$package/htdocs" -type f -name '*.css' -print0)
 done
-node --check "$stage/luci-app-nova-dashboard/htdocs/luci-static/resources/view/nova/dashboard.js"
+node --check "$stage/luci-theme-nova/htdocs/luci-static/resources/view/nova/dashboard.js"
 node --check "$stage/luci-theme-nova/htdocs/luci-static/nova/nova-shell.js"
 node --check "$stage/luci-theme-nova/htdocs/luci-static/nova/nova-lists.js"
-node --test "$stage/tests/dashboard.test.js" "$stage/tests/native-lists.test.js" "$stage/tests/navigation.test.js" "$stage/tests/menu-localization.test.js" "$stage/tests/package-independence.test.js"
+node --check "$stage/luci-theme-nova/htdocs/luci-static/nova/nova-search.js"
+node --test "$stage/tests/dashboard.test.js" "$stage/tests/native-lists.test.js" "$stage/tests/navigation.test.js" "$stage/tests/menu-localization.test.js" "$stage/tests/package-integration.test.js" "$stage/tests/page-search.test.js" "$stage/tests/page-search-interaction.test.js"
 export XDG_CACHE_HOME="$stage/browser-cache"
 mkdir -p "$XDG_CACHE_HOME/fontconfig"
 if command -v fc-cache >/dev/null 2>&1; then
     fc-cache
 fi
-node --test --test-concurrency=1 "$stage/tests/browser-layout.test.js" "$stage/tests/native-lists-browser.test.js" "$stage/tests/navigation-browser.test.js" "$stage/tests/visual-browser.test.js" "$stage/tests/native-spacing-browser.test.js" "$stage/tests/sidebar-overflow-browser.test.js"
+node --test --test-concurrency=1 "$stage/tests/browser-layout.test.js" "$stage/tests/native-lists-browser.test.js" "$stage/tests/navigation-browser.test.js" "$stage/tests/visual-browser.test.js" "$stage/tests/native-spacing-browser.test.js" "$stage/tests/sidebar-overflow-browser.test.js" "$stage/tests/dashboard-preferences-browser.test.js" "$stage/tests/page-search-browser.test.js"

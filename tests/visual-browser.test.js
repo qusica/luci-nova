@@ -14,7 +14,7 @@ function fixture() {
     const theme = read('luci-theme-nova/htdocs/luci-static/nova/cascade.css');
     const lists = read('luci-theme-nova/htdocs/luci-static/nova/nova-lists.css');
     const shell = read('luci-theme-nova/htdocs/luci-static/nova/nova-shell.js');
-    const dashboard = read('luci-app-nova-dashboard/htdocs/luci-static/resources/view/nova/dashboard.js');
+    const dashboard = read('luci-theme-nova/htdocs/luci-static/resources/view/nova/dashboard.js');
     return `<!doctype html><html data-darkmode="true" lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <style>*{box-sizing:border-box}body{margin:0}ul{list-style:none;margin:0;padding:0}a{text-decoration:none;cursor:pointer}button{cursor:pointer}button,input{font-family:inherit}.cbi-value{padding:12px 0;display:flex;gap:20px;border-bottom:1px solid}.cbi-value-title{width:160px}.cbi-value-field{flex:1}.cbi-value input,.cbi-value select{padding:8px 10px;max-width:100%}.cbi-button{padding:8px 14px;border:1px solid #45576c;background:#202a35;color:#e9eef5}.table{width:100%;border-collapse:collapse}.table td,.table th{padding:12px;border-bottom:1px solid #303d4c;text-align:left}.table th{color:#a6b3c2;font-weight:500}.cbi-page-actions{display:flex;gap:10px;justify-content:flex-end}.cbi-tabmenu{display:flex;gap:20px;margin:0 0 20px}.cbi-tabmenu li{height:25px;margin:4px 2px 0;padding:0}.cbi-tabmenu li a{line-height:25px;padding:4px 6px}.cbi-value-description{font-size:12px;margin-top:5px}@media(max-width:640px){.cbi-value{display:block}.cbi-value-title{display:block;margin-bottom:8px}}
 </style><style>${theme}\n${lists}</style>
@@ -65,7 +65,7 @@ function luminance(rgb) {
 test('Quiet Slate visual hierarchy, accessible contrast and responsive containment', {timeout:90000}, async()=>{
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'nova-visual-'));
  fs.writeFileSync(path.join(dir,'index.html'),fixture());
- fs.copyFileSync(path.join(root,'luci-app-nova-dashboard/htdocs/luci-static/resources/nova/dashboard.css'),path.join(dir,'dashboard.css'));
+ fs.copyFileSync(path.join(root,'luci-theme-nova/htdocs/luci-static/resources/nova/dashboard.css'),path.join(dir,'dashboard.css'));
  const browser=chromium(dir);
  try {
   const {targetId}=await browser.send('Target.createTarget',{url:'about:blank'});
