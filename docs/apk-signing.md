@@ -5,6 +5,15 @@ a release, alter router trust, or make unsigned CI artifacts safe for LuCI uploa
 `TEST-ONLY-*` artifacts and keys are for disposable systems only. Test private
 keys are deleted before the script exits.
 
+## Integrated package migration
+
+Starting with 0.3.0, Dashboard is included in `luci-theme-nova`; there is no
+separate `luci-app-nova-dashboard` artifact. The theme explicitly conflicts with
+the old dashboard package to prevent mixed installations. Keep Bootstrap installed,
+switch to it, and remove the old `luci-app-nova-dashboard` before installing the
+integrated theme. Do not bypass package conflicts or signature verification.
+The dashboard route and installed asset filenames are preserved.
+
 ## Why LuCI rejected the packages
 
 The SDK creates unsigned APK v3 packages. A signed repository index is separate
@@ -20,10 +29,10 @@ implementation must not be presented as per-IPK signing.
 
 ## Implemented test
 
-`scripts/test-apk-signing.sh APK THEME.apk DASHBOARD.apk NEW_OUTPUT_DIR`
+`scripts/test-apk-signing.sh APK THEME.apk NEW_OUTPUT_DIR`
 
 - Creates ECDSA P-256 keys in a temporary directory with restrictive permissions.
-- Calls `sign-apks.sh` to sign separate copies of the two packages.
+- Calls `sign-apks.sh` to sign a copy of the integrated theme package.
 - Uses one `adbsign --allow-untrusted --reset-signatures --sign-key` call per file.
 - Independently verifies every signed output with an isolated public-key directory
   and `APK_CONFIG=/dev/null`. Verification never uses `--allow-untrusted`.
@@ -57,8 +66,8 @@ test keys and never references the production secret.
 The two jobs run on separate fresh runners. The build job receives no signing
 secret. The signing job downloads only the current run's named intermediate
 artifact, installs/builds the pinned APK tool, then reads the key in one step.
-It checks package metadata, matching versions and reviewed public-key fingerprint,
-signs both packages, strictly verifies the results, and removes temporary key
+It checks package metadata, the filename/version match and reviewed public-key fingerprint,
+signs the integrated package, strictly verifies the results, and removes temporary key
 files before uploading the exact public output files. All actions in the signed
 workflow use full commit pins. No build cache is restored in the signing job.
 
@@ -88,7 +97,7 @@ run it. Secret/variable changes alone do not trigger a build. After the first
 successful run, main updates and v* tags build and sign automatically.
 
 Download `luci-nova-25.12-signed-apk-<commit>` from that run's Artifacts. It holds
-both signed APKs, `nova-signing-public.pem`, its DER fingerprint, package/file
+the signed theme APK (including Dashboard), `nova-signing-public.pem`, its DER fingerprint, package/file
 checksums, and source/run provenance. Artifacts are retained for 30 days. This
 workflow does not create a GitHub Release or an online package feed. Ignore the
 one-day `intermediate-unsigned-apk-*` artifact for installation.
@@ -101,7 +110,7 @@ one-day `intermediate-unsigned-apk-*` artifact for installation.
    commit, log, upload as an artifact, pass to fork PRs, or paste it into chat.
    Do not repurpose the temporary test key; its private part no longer exists.
 3. Publish the actual public PEM and its SHA256-of-DER fingerprint for review.
-   Build and sign both APKs, then repeat independent and tamper verification.
+   Build and sign the integrated APK, then repeat independent and tamper verification.
    Publish only the signed outputs, checksums and public key, never an entire
    working directory that could include secrets. Fail closed if key input is
    unavailable or output verification fails.
@@ -111,8 +120,8 @@ one-day `intermediate-unsigned-apk-*` artifact for installation.
    by APK, so keeping the signer secure matters.
 5. Only after that approval, verify the downloaded public key fingerprint and
    copy it to `/etc/apk/keys/nova-release.pem` with mode 0644. Do not disable
-   signature verification. Confirm with `apk verify` that both exact packages
-   are accepted, then upload the signed theme and dashboard in LuCI's package
+   signature verification. Confirm with `apk verify` that the exact package
+   is accepted, then upload the signed integrated theme in LuCI's package
    manager. Keep Bootstrap installed, then select Nova in Language and Style.
 
 The future one-time router commands, once the real key and its fingerprint
@@ -123,7 +132,7 @@ are reviewed, are:
 # Verify its SHA256-of-DER fingerprint first, off-router if OpenSSL is absent.
 cp /tmp/nova-release.pem /etc/apk/keys/nova-release.pem
 chmod 0644 /etc/apk/keys/nova-release.pem
-apk verify /tmp/luci-theme-nova-*.apk /tmp/luci-app-nova-dashboard-*.apk
+apk verify /tmp/luci-theme-nova-*.apk
 # Then use LuCI upload, or the normal apk add flow, without --allow-untrusted.
 ```
 

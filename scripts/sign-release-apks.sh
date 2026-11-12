@@ -3,8 +3,8 @@
 set +x
 set -euo pipefail
 umask 077
-if [[ $# -ne 4 ]]; then
-  echo "Usage: $0 APK THEME.apk DASHBOARD.apk NEW_OUTPUT_DIR" >&2; exit 2
+if [[ $# -ne 3 ]]; then
+  echo "Usage: $0 APK THEME.apk NEW_OUTPUT_DIR" >&2; exit 2
 fi
 [[ -n ${NOVA_APK_SIGNING_KEY:-} ]] || {
   echo 'Missing repository secret NOVA_APK_SIGNING_KEY; refusing unsigned release.' >&2; exit 2;
@@ -31,5 +31,5 @@ actual=$(sha256sum "$work/public.der" | cut -d ' ' -f 1)
 openssl pkey -pubin -in "$work/public.pem" -text -noout | grep -q 'NIST CURVE: P-256' || {
   echo 'Signing key must be ECDSA P-256.' >&2; exit 2;
 }
-bash "$base/sign-apks.sh" "$1" "$work/private.pem" "$work/public.pem" "$4" "$2" "$3"
+bash "$base/sign-apks.sh" "$1" "$work/private.pem" "$work/public.pem" "$3" "$2"
 # The trap removes the private key before any later artifact-upload step.

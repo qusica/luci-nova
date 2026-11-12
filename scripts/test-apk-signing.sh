@@ -2,13 +2,12 @@
 # Test-only keys are deleted on exit. Output must never be used as a release.
 set -euo pipefail
 umask 077
-if [[ $# -ne 4 ]]; then
-  echo "Usage: $0 APK THEME.apk DASHBOARD.apk NEW_OUTPUT_DIR" >&2; exit 2
+if [[ $# -ne 3 ]]; then
+  echo "Usage: $0 APK THEME.apk NEW_OUTPUT_DIR" >&2; exit 2
 fi
 apk=$(realpath "$1")
 theme=$(realpath "$2")
-dashboard=$(realpath "$3")
-out=$4
+out=$3
 [[ ! -e $out && ! -L $out ]]
 base=$(cd "$(dirname "$0")" && pwd)
 work=$(mktemp -d)
@@ -19,7 +18,7 @@ openssl pkey -in "$work/test-private.pem" -pubout -out "$work/trust/test.pem"
 openssl ecparam -name prime256v1 -genkey -noout -out "$work/wrong-private.pem"
 openssl pkey -in "$work/wrong-private.pem" -pubout -out "$work/wrong-trust/wrong.pem"
 bash "$base/sign-apks.sh" "$apk" "$work/test-private.pem" "$work/trust/test.pem" \
-  "$out" "$theme" "$dashboard"
+  "$out" "$theme"
 expect_reject() {
   local label=$1; shift
   if "$@" > "$work/rejection.log" 2>&1; then
@@ -27,7 +26,7 @@ expect_reject() {
   fi
   printf 'PASS: %s rejected\n' "$label"
 }
-for source in "$theme" "$dashboard"; do
+for source in "$theme"; do
   package="$out/$(basename "$source")"
   APK_CONFIG=/dev/null "$apk" --keys-dir "$work/trust" verify "$package"
   echo "PASS: $(basename "$package") trusted signature accepted"
@@ -47,34 +46,34 @@ PY
     "$apk" --keys-dir "$work/trust" verify "$work/tampered.apk"
 done
 expect_reject 'mismatched key pair' bash "$base/sign-apks.sh" "$apk" \
-  "$work/test-private.pem" "$work/wrong-trust/wrong.pem" "$work/bad-output" "$theme" "$dashboard"
+  "$work/test-private.pem" "$work/wrong-trust/wrong.pem" "$work/bad-output" "$theme"
 [[ ! -e $work/bad-output ]]
 expect_reject 'existing output directory' bash "$base/sign-apks.sh" "$apk" \
-  "$work/test-private.pem" "$work/trust/test.pem" "$out" "$theme" "$dashboard"
+  "$work/test-private.pem" "$work/trust/test.pem" "$out" "$theme"
 cat "$work/trust/test.pem" "$work/test-private.pem" > "$work/concatenated.pem"
 bash "$base/sign-apks.sh" "$apk" "$work/test-private.pem" "$work/concatenated.pem" \
-  "$work/normalized-output" "$theme" "$dashboard"
+  "$work/normalized-output" "$theme"
 cmp -s "$work/trust/test.pem" "$work/normalized-output/nova-signing-public.pem"
 if grep -q 'PRIVATE KEY' "$work/normalized-output/nova-signing-public.pem"; then
   echo 'FAIL: private key material appeared in public output' >&2; exit 1
 fi
 echo 'PASS: public output strips concatenated private-key material'
-cp "$dashboard" "$work/luci-theme-nova-wrong.apk"
+cp "$theme" "$work/luci-theme-nova-wrong.apk"
 expect_reject 'package filename/metadata mismatch' bash "$base/sign-apks.sh" "$apk" \
   "$work/test-private.pem" "$work/trust/test.pem" "$work/wrong-metadata" \
-  "$work/luci-theme-nova-wrong.apk" "$dashboard"
+  "$work/luci-theme-nova-wrong.apk"
 expect_reject 'missing release signing secret' env -u NOVA_APK_SIGNING_KEY \
-  bash "$base/sign-release-apks.sh" "$apk" "$theme" "$dashboard" "$work/missing-secret"
+  bash "$base/sign-release-apks.sh" "$apk" "$theme" "$work/missing-secret"
 mkdir "$work/runner"
 fingerprint=$(openssl pkey -pubin -in "$work/trust/test.pem" -outform DER | sha256sum | cut -d ' ' -f 1)
 NOVA_APK_SIGNING_KEY=$(cat "$work/test-private.pem") \
 NOVA_APK_SIGNING_PUBLIC_KEY_SHA256="$fingerprint" RUNNER_TEMP="$work/runner" \
-  bash "$base/sign-release-apks.sh" "$apk" "$theme" "$dashboard" "$work/release-output"
+  bash "$base/sign-release-apks.sh" "$apk" "$theme" "$work/release-output"
 echo 'PASS: release wrapper accepts the reviewed disposable key'
 expect_reject 'wrong release signing fingerprint' env \
   NOVA_APK_SIGNING_KEY="$(cat "$work/test-private.pem")" \
   NOVA_APK_SIGNING_PUBLIC_KEY_SHA256="$(printf '%064d' 0)" RUNNER_TEMP="$work/runner" \
-  bash "$base/sign-release-apks.sh" "$apk" "$theme" "$dashboard" "$work/wrong-fingerprint"
+  bash "$base/sign-release-apks.sh" "$apk" "$theme" "$work/wrong-fingerprint"
 test -z "$(find "$work/runner" -mindepth 1 -print -quit)"
 echo 'PASS: release wrapper removes temporary key files on success and failure'
 printf '%s\n' 'TEST ONLY. Ephemeral private key deleted after this run.' \

@@ -31,11 +31,11 @@ jobs:
           fetch-depth: 0
       - name: Check JavaScript syntax
         run: |
-          node --check luci-app-nova-dashboard/htdocs/luci-static/resources/view/nova/dashboard.js
+          node --check luci-theme-nova/htdocs/luci-static/resources/view/nova/dashboard.js
           node --check luci-theme-nova/htdocs/luci-static/nova/nova-shell.js
           node --check luci-theme-nova/htdocs/luci-static/nova/nova-lists.js
       - name: Test dashboard rendering
-        run: node --test tests/dashboard.test.js tests/native-lists.test.js tests/navigation.test.js tests/menu-localization.test.js tests/package-independence.test.js
+        run: node --test tests/dashboard.test.js tests/native-lists.test.js tests/navigation.test.js tests/menu-localization.test.js tests/package-integration.test.js
       - name: Test asset cache versions
         env:
           NOVA_ASSET_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
@@ -51,7 +51,7 @@ jobs:
         env:
           ARCH: ${{ matrix.arch }}-${{ matrix.sdk }}
           FEEDNAME: nova
-          PACKAGES: luci-theme-nova luci-app-nova-dashboard
+          PACKAGES: luci-theme-nova
           BUILD_LOG: 1
       - name: Test actual built IPK assets and metadata
         if: matrix.ext == 'ipk'
@@ -59,10 +59,8 @@ jobs:
         run: |
           set -euo pipefail
           mapfile -d '' themes < <(find bin/packages -type f -name 'luci-theme-nova_*.ipk' -print0)
-          mapfile -d '' dashboards < <(find bin/packages -type f -name 'luci-app-nova-dashboard_*.ipk' -print0)
           test "${#themes[@]}" -eq 1
-          test "${#dashboards[@]}" -eq 1
-          bash scripts/test-built-ipks.sh "${themes[0]}" "${dashboards[0]}" "$RUNNER_TEMP/nova-built-ipk-assets-test"
+          bash scripts/test-built-ipks.sh "${themes[0]}" "$RUNNER_TEMP/nova-built-ipk-assets-test"
       - name: Install host APK build dependencies (test only)
         if: matrix.ext == 'apk'
         run: |
@@ -77,22 +75,18 @@ jobs:
         run: |
           set -euo pipefail
           mapfile -d '' themes < <(find bin/packages -type f -name 'luci-theme-nova-*.apk' -print0)
-          mapfile -d '' dashboards < <(find bin/packages -type f -name 'luci-app-nova-dashboard-*.apk' -print0)
           test "${#themes[@]}" -eq 1
-          test "${#dashboards[@]}" -eq 1
           bash scripts/test-built-apks.sh "$RUNNER_TEMP/nova-host-apk/build/src/apk" \
-            "${themes[0]}" "${dashboards[0]}" "$RUNNER_TEMP/nova-built-assets-test"
+            "${themes[0]}" "$RUNNER_TEMP/nova-built-assets-test"
       - name: Test individual APK signatures with disposable keys
         if: matrix.ext == 'apk'
         shell: bash
         run: |
           set -euo pipefail
           mapfile -d '' themes < <(find bin/packages -type f -name 'luci-theme-nova-*.apk' -print0)
-          mapfile -d '' dashboards < <(find bin/packages -type f -name 'luci-app-nova-dashboard-*.apk' -print0)
           test "${#themes[@]}" -eq 1
-          test "${#dashboards[@]}" -eq 1
           bash scripts/test-apk-signing.sh "$RUNNER_TEMP/nova-host-apk/build/src/apk" \
-            "${themes[0]}" "${dashboards[0]}" "$RUNNER_TEMP/nova-test-signed"
+            "${themes[0]}" "$RUNNER_TEMP/nova-test-signed"
       - name: Record source and package checksums
         shell: bash
         run: |
@@ -101,8 +95,7 @@ jobs:
           printf 'repository=%s\ncommit=%s\nref=%s\nsdk=%s\nformat=%s\nrun=%s/%s/actions/runs/%s\n' \
             "$GITHUB_REPOSITORY" "$GITHUB_SHA" "$GITHUB_REF" "${{ matrix.sdk }}" "${{ matrix.ext }}" \
             "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" > package-provenance/BUILD-SOURCE.txt
-          find bin/packages -type f \( -name 'luci-theme-nova${{ matrix.package_separator }}*.${{ matrix.ext }}' -o \
-            -name 'luci-app-nova-dashboard${{ matrix.package_separator }}*.${{ matrix.ext }}' \) -print0 | \
+          find bin/packages -type f -name 'luci-theme-nova${{ matrix.package_separator }}*.${{ matrix.ext }}' -print0 | \
             sort -z | xargs -0 sha256sum > package-provenance/SHA256SUMS
       - name: Upload built ${{ matrix.ext }} packages
         uses: actions/upload-artifact@v4
@@ -110,7 +103,6 @@ jobs:
           name: luci-nova-${{ matrix.series }}-${{ matrix.ext }}
           path: |
             bin/packages/**/luci-theme-nova${{ matrix.package_separator }}*.${{ matrix.ext }}
-            bin/packages/**/luci-app-nova-dashboard${{ matrix.package_separator }}*.${{ matrix.ext }}
             package-provenance/
           if-no-files-found: error
       - name: Upload TEST ONLY signed APKs and disposable public key

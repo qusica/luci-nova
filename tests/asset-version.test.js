@@ -7,7 +7,7 @@ const path = require('node:path');
 const test = require('node:test');
 
 const root = path.resolve(__dirname, '..');
-const packages = ['luci-theme-nova', 'luci-app-nova-dashboard'];
+const packages = ['luci-theme-nova'];
 function version(makefile) {
     const match = makefile.match(/^PKG_VERSION:=(\S+)$/m);
     assert.ok(match, 'package must define an explicit asset version');
@@ -15,12 +15,11 @@ function version(makefile) {
 }
 const versions = packages.map(name => version(fs.readFileSync(path.join(root, name, 'Makefile'), 'utf8')));
 
-test('theme, dashboard package and dashboard CSS cache key share one version', () => {
-    assert.equal(versions[0], versions[1]);
-    const source = fs.readFileSync(path.join(root, packages[1], 'htdocs/luci-static/resources/view/nova/dashboard.js'), 'utf8');
+test('integrated theme and dashboard CSS cache key share one version', () => {
+    const source = fs.readFileSync(path.join(root, packages[0], 'htdocs/luci-static/resources/view/nova/dashboard.js'), 'utf8');
     const assetVersion = source.match(/var dashboardAssetVersion = '([^']+)';/);
     assert.ok(assetVersion, 'dashboard stylesheet requires a versioned cache key');
-    assert.equal(assetVersion[1], versions[1]);
+    assert.equal(assetVersion[1], versions[0]);
 });
 
 // LuCI appends PKG_VERSION, not PKG_RELEASE, to template CSS/JS URLs.

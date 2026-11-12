@@ -12,9 +12,9 @@ const { pathToFileURL } = require('node:url');
 // This is an isolated CSS/DOM fixture, not a full LuCI integration test.
 test('dashboard grids and narrow navigation render in Chromium', () => {
     const root = path.resolve(__dirname, '..');
-    const source = fs.readFileSync(path.join(root, 'luci-app-nova-dashboard/htdocs/luci-static/resources/view/nova/dashboard.js'), 'utf8');
+    const source = fs.readFileSync(path.join(root, 'luci-theme-nova/htdocs/luci-static/resources/view/nova/dashboard.js'), 'utf8');
     const theme = fs.readFileSync(path.join(root, 'luci-theme-nova/htdocs/luci-static/nova/cascade.css'), 'utf8');
-    const dashboard = fs.readFileSync(path.join(root, 'luci-app-nova-dashboard/htdocs/luci-static/resources/nova/dashboard.css'), 'utf8');
+    const dashboard = fs.readFileSync(path.join(root, 'luci-theme-nova/htdocs/luci-static/resources/nova/dashboard.css'), 'utf8');
     const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'nova-layout-'));
     try {
         fs.writeFileSync(path.join(temporary, 'dashboard.css'), dashboard);
@@ -71,7 +71,7 @@ try {
         {url:x=>'/cgi-bin/luci/'+x,resource:x=>${JSON.stringify(dashboardUrl)}},document);
     const data=await app.load();
     const stylesheet=document.getElementById('nova-dashboard-style');
-    const expectedHref=${JSON.stringify(dashboardUrl)}+'?v=0.2.12';
+    const expectedHref=${JSON.stringify(dashboardUrl)}+'?v=0.3.0';
     const styleLoaded=new Promise((resolve,reject)=>{
         function loaded(){
             if(stylesheet.getAttribute('href')===expectedHref && stylesheet.sheet && stylesheet.sheet.href===expectedHref){
@@ -84,7 +84,7 @@ try {
     document.getElementById('maincontent').append(app.render(data));
     await styleLoaded;
     function check(condition,message){if(!condition)throw new Error(message);}
-    check(stylesheet.getAttribute('href')===${JSON.stringify(dashboardUrl)}+'?v=0.2.12','stale CSS link was not upgraded');
+    check(stylesheet.getAttribute('href')===${JSON.stringify(dashboardUrl)}+'?v=0.3.0','stale CSS link was not upgraded');
     check(!/null|undefined/.test(document.querySelector('.nova-dashboard').textContent),'conditional DOM entries leaked literal null/undefined');
     const vectorNodes=[...document.querySelectorAll('.nova-dashboard svg,.nova-dashboard svg *')];
     check(vectorNodes.length>0 && vectorNodes.every(n=>n.namespaceURI==='http://www.w3.org/2000/svg'),'SVG must use native SVG namespace, not a fixture repair');

@@ -1,13 +1,16 @@
 # LuCI Nova
 
-Nova is a dark LuCI theme and a companion status dashboard for OpenWrt and ImmortalWrt.
+Nova is a dark LuCI theme with a built-in status dashboard for OpenWrt and ImmortalWrt.
 
-> Preview 0.2.12: detected interface cards, live PPPoE status and searchable native LuCI lists. This is still experimental and has not been tested on every router or firmware. Keep Bootstrap installed for safe rollback.
+> Preview 0.3.0: one theme package with the built-in Dashboard, detected interface cards, live PPPoE status and searchable native LuCI lists. This is still experimental and has not been tested on every router or firmware. Keep Bootstrap installed for safe rollback.
 
-## Packages
+## Package
 
-- `luci-theme-nova` — standalone dark visual theme, with Bootstrap as its supported base. It does not depend on the dashboard.
-- `luci-app-nova-dashboard` — optional, independent LuCI dashboard under **Nova Dashboard / Nova 仪表盘** (also available via **Status → Nova Dashboard**). It can also run with Bootstrap without installing the Nova theme.
+- `luci-theme-nova` — the dark theme and Nova Dashboard in one package, with Bootstrap as its supported base.
+- The old `luci-app-nova-dashboard` package is no longer built. Remove it before upgrading to 0.3.0; the new theme declares a conflict to protect file ownership.
+- Native **Status → Overview**, full native information and configuration pages remain available.
+
+See [the APK/IPK migration guide](docs/package-migration.md) for existing installations, conflict handling and rollback.
 
 ## IPK and APK builds
 
@@ -31,27 +34,23 @@ The IPKs are ordinary local opkg packages, not individually signed APKs.
 
 ## Install
 
-Download the theme package for your firmware series from a successful signed build (or a future release). Download the dashboard only if you want its extra status page. Transfer only the packages you intend to install to your router.
+Download the single theme package for your firmware from a successful build.
+APK installations require a publisher-signed package and its reviewed, trusted
+key. For an existing installation, [remove the old standalone Dashboard first](docs/package-migration.md).
 
 For **opkg**:
 ```sh
-opkg install /tmp/luci-theme-nova_*.ipk
-# Optional, separately:
-opkg install /tmp/luci-app-nova-dashboard_*.ipk
+opkg install /tmp/luci-theme-nova_0.3.0-r1_all.ipk
 ```
 
-For **apk**, once the selected package is individually signed and the reviewed
-publisher key is trusted by your router:
+For **apk**, after the package is signed and its publisher key is already trusted:
 ```sh
-apk add /tmp/luci-theme-nova-0.2.12-r1.apk
-# Optional, separately:
-apk add /tmp/luci-app-nova-dashboard-0.2.12-r1.apk
+apk add /tmp/luci-theme-nova-0.3.0-r1.apk
 ```
 
-You may install, upgrade, or remove either Nova package independently. A build
-producing both packages with the same version is not an installation dependency.
-The brand link uses LuCI's normal home entry: it opens the optional dashboard
-when that is the first accessible page, otherwise a native LuCI page.
+The Dashboard is included and keeps its existing **Nova Dashboard / Nova 仪表盘**
+and **Status → Nova Dashboard** entries. The brand uses LuCI's native home and
+access checks. No separate Dashboard install or version matching is needed.
 
 The ordinary CI APK artifacts are unsigned. LuCI upload verifies package
 signatures and will reject them. The separate **Build signed APK packages**
@@ -81,10 +80,9 @@ Treat this repository as an OpenWrt package feed:
 ```sh
 echo 'src-git nova https://github.com/qusica/luci-nova.git' >> feeds.conf.default
 ./scripts/feeds update nova
-./scripts/feeds install -p nova luci-theme-nova luci-app-nova-dashboard
+./scripts/feeds install -p nova luci-theme-nova
 make defconfig
 make package/feeds/nova/luci-theme-nova/compile V=s
-make package/feeds/nova/luci-app-nova-dashboard/compile V=s
 ```
 
 The output suffix (`.ipk` or `.apk`) is decided by the SDK. Prefer official versions matching the running firmware.
@@ -94,9 +92,9 @@ The output suffix (`.ipk` or `.apk`) is decided by the SDK. Prefer official vers
 Run the dependency-free dashboard rendering tests with Node.js 18 or newer:
 
 ```sh
-node --test tests/dashboard.test.js tests/native-lists.test.js tests/navigation.test.js tests/menu-localization.test.js tests/package-independence.test.js
+node --test tests/dashboard.test.js tests/native-lists.test.js tests/navigation.test.js tests/menu-localization.test.js tests/package-integration.test.js
 node --test tests/asset-version.test.js
-node --check luci-app-nova-dashboard/htdocs/luci-static/resources/view/nova/dashboard.js
+node --check luci-theme-nova/htdocs/luci-static/resources/view/nova/dashboard.js
 node --check luci-theme-nova/htdocs/luci-static/nova/nova-shell.js
 ```
 
@@ -125,7 +123,7 @@ verify the router's cache headers or the full Bootstrap/LuCI stack.
 The navigation test sends real Chrome mouse, keyboard, and touch input to check
 that hovering cannot expand menus or move the next click target.
 
-When changing browser assets, bump `PKG_VERSION` in both package Makefiles and
+When changing browser assets, bump `PKG_VERSION` in the theme Makefile and
 `dashboardAssetVersion` in dashboard.js. LuCI's template substitution uses
 `PKG_VERSION` for CSS/JS cache keys and ignores `PKG_RELEASE`; an r-only update can
 leave the old styles cached. CI compares changed assets with the PR/push base and
@@ -136,12 +134,23 @@ rejects that mistake. To run the same comparison locally, set
 
 - No hard-coded WAN interface names or credentials.
 - No change to router configuration on install, aside from adding a selectable theme entry.
-- The custom dashboard is optional and can be removed independently.
-- A separate package prevents the theme from requiring expensive monitoring services.
+- Dashboard is bundled into the theme without adding monitoring services.
+- The old standalone app must be removed first; no automatic or forced package removal runs on installation.
 
 ## License
 
 Project-authored files: MIT. Templates adapted from the LuCI Bootstrap theme retain their upstream Apache-2.0 notices.
+
+## What's new in 0.3.0
+
+- Bundle Dashboard assets, menu, read-only RPC access and Chinese translation
+  into `luci-theme-nova`; build and sign only one Nova package per format.
+- Preserve native Overview, every existing status/configuration page, routes and
+  ACL identities. Dashboard data and Nova's palette are unchanged.
+- Reject co-installation with the old standalone app. Document a remove-first
+  migration for APK/IPK instead of forcing file replacement or editing APK world.
+- Safely fall back to Bootstrap when removing an active Nova theme. Keep another
+  selected theme and replacement installs untouched.
 
 ## What's new in 0.2.12
 
@@ -256,18 +265,10 @@ Detection uses strict `network.interface dump` and `network.wireless status` rea
 
 ### Updating an existing installation
 
-Download the fresh package you want to update from a **successful signed** build.
-Use the device's normal package-manager update procedure for that package, then
-reload the browser. Updating the theme does not require updating or installing
-the dashboard, and updating the dashboard does not require updating the theme.
-Keep Bootstrap installed. SSH rollback remains available above.
-
-If APK reports a `world[...]` checksum conflict involving an unchanged package,
-do not infer a dependency or uninstall working packages. A matching local-file
-checksum pin is supported and should not block an independent upgrade. Compare
-the exact constraint with the installed package before repairing an inconsistent
-pin. See [independent installation and APK diagnostics](docs/package-independence.md).
-
+0.3.0 changes package ownership. Follow the [migration guide](docs/package-migration.md):
+remove `luci-app-nova-dashboard` if present, then upgrade `luci-theme-nova` using
+the signed APK or matching IPK. Keep Bootstrap installed. No native router
+configuration is removed. Subsequent updates require only the theme package.
 
 ### Current limitations
 

@@ -7,7 +7,7 @@ const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
 
-const app = path.resolve(__dirname, '..', 'luci-app-nova-dashboard');
+const app = path.resolve(__dirname, '..', 'luci-theme-nova');
 const catalogPath = path.join(app, 'root/usr/lib/lua/luci/i18n/nova-dashboard.zh-cn.lmo');
 const poPath = path.join(app, 'translations/zh_Hans/nova-dashboard.po');
 const sourceTree = fs.existsSync(path.join(app, 'Makefile'));

@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
 
-const resources = path.resolve(__dirname, '../luci-app-nova-dashboard/htdocs/luci-static/resources');
+const resources = path.resolve(__dirname, '../luci-theme-nova/htdocs/luci-static/resources');
 const source = fs.readFileSync(path.join(resources, 'view/nova/dashboard.js'), 'utf8');
 const hasClass = name => node => (node.attrs.class || '').split(' ').includes(name);
 function all(node, predicate) {
@@ -435,11 +435,11 @@ test('read-only ACL covers strict inventories and no router configuration writes
 
 test('versioned stylesheet is upgraded once; render and remove maintain one poll',async()=>{
     const app=harness();await app.render();assert.equal(app.polls.size,1);
-    const style=app.document.head.children[0];assert.equal(style.attrs.href,'/luci-static/resources/nova/dashboard.css?v=0.2.12');
+    const style=app.document.head.children[0];assert.equal(style.attrs.href,'/luci-static/resources/nova/dashboard.css?v=0.3.0');
     assert.ok(fs.statSync(path.join(resources,'nova/dashboard.css')).size>0);
     for(const old of ['','?v=0.2.2']){
         app.view.remove();style.attrs.href='/luci-static/resources/nova/dashboard.css'+old;
-        await app.render();assert.equal(app.document.head.children.length,1);assert.match(style.attrs.href,/\?v=0\.2\.12$/);assert.equal(app.polls.size,1);
+        await app.render();assert.equal(app.document.head.children.length,1);assert.match(style.attrs.href,/\?v=0\.3\.0$/);assert.equal(app.polls.size,1);
     }
     app.view.remove();assert.equal(app.polls.size,0);
 });
