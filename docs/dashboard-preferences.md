@@ -29,3 +29,11 @@ failed reads. Values are not invented when reads fail. Changing the interval,
 navigating away or hiding the tab invalidates late responses so they cannot
 restart polling or rebuild an obsolete page. These settings control Nova's
 Dashboard only, not LuCI's native page refresh or the router's services.
+
+Version 0.3.1 fixes a LuCI scheduler startup race: `poll.add()` can synchronously
+invoke the callback before `render()` returns and before LuCI mounts the root.
+That one pre-mount tick is ignored without unregistering the callback. A later
+tick on a detached or abandoned root still cleans up. Topology replacement,
+pause/resume, interval changes and hidden-tab recovery use the same lifecycle.
+Regressions execute the unchanged upstream 24.10 and 25.12 Poll implementations,
+including synchronous startup, rather than only registering a delayed mock.

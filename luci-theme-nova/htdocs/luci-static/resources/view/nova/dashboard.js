@@ -5,7 +5,7 @@
 'require fs';
 
 // Keep in sync with PKG_VERSION; tests enforce this cache key on every release.
-var dashboardAssetVersion = '0.3.0';
+var dashboardAssetVersion = '0.3.1';
 
 // Preferences are presentation-only and scoped to this browser, never UCI.
 var preferenceKey = 'nova.dashboard.preferences.v1';
@@ -589,7 +589,7 @@ return view.extend({
                 detected:d[8]
             });
         }
-        var lastSignature=signature(data), updating=false, sampling=false, epoch=0;
+        var lastSignature=signature(data), updating=false, sampling=false, epoch=0, mounting=true;
         function visible(key){return registry.some(function(card){return card.key===key && !card.node.hidden;});}
         function enabled(){return prefs.interval!==0 && !document.hidden && registry.some(function(card){return !card.node.hidden;});}
         function current(token){return root.isConnected && self._novaPoll===update && enabled() && token===epoch;}
@@ -698,7 +698,13 @@ return view.extend({
             }).finally(function(){sampling=false;});
         }
         function update(){
-            if(!root.isConnected && self._novaPoll===update){self.remove();return Promise.resolve();}
+            if(!root.isConnected){
+                // LuCI poll.add() can synchronously start and tick while
+                // render() is still building an unmounted root. Keep that
+                // registration alive; later disconnected ticks are teardown.
+                if(!mounting && self._novaPoll===update)self.remove();
+                return Promise.resolve();
+            }
             if(updating || sampling || !current(epoch))return Promise.resolve();
             updating=true;
             var token=epoch;
@@ -726,7 +732,7 @@ return view.extend({
             poll.remove(update);
             if(document.removeEventListener)document.removeEventListener('visibilitychange',visibility);
         };
-        configurePoll();
+        try{configurePoll();}finally{mounting=false;}
         return root;
     },
     remove:function(){

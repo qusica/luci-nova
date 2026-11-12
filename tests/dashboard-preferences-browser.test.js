@@ -12,6 +12,7 @@ test('dashboard preferences work with native controls, keyboard, persistence and
     const directory=fs.mkdtempSync(path.join(os.tmpdir(),'nova-preferences-'));
     const resources=path.resolve(__dirname,'../luci-theme-nova/htdocs/luci-static/resources');
     const source=fs.readFileSync(path.join(resources,'view/nova/dashboard.js'),'utf8');
+    const pollSource=fs.readFileSync(path.join(__dirname,'fixtures/luci-poll-25.12.js'),'utf8');
     fs.copyFileSync(path.join(resources,'nova/dashboard.css'),path.join(directory,'dashboard.css'));
     fs.writeFileSync(path.join(directory,'index.html'),'<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="dashboard.css"><style>body{margin:12px;background:#111923}</style><main id="mount"></main>');
     const browser=chromium(directory);
@@ -51,7 +52,13 @@ test('dashboard preferences work with native controls, keyboard, persistence and
                 for(const child of Array.isArray(children)?children:[children])e.append(child);
                 return e;
             };
-            window.polls=new Map();window.calls=[];
+            window.calls=[];
+            let timer,timerId=0;
+            window.nativePoll=new Function('Class','env','window','document','CustomEvent',${JSON.stringify(pollSource+'\nreturn Poll;')})(
+                {singleton:value=>value},{},{setInterval:fn=>{timer=fn;return ++timerId;},clearInterval:()=>{timer=null;}},document,CustomEvent);
+            nativePoll.start();
+            Object.defineProperty(window,'polls',{get:()=>new Map(nativePoll.queue.map(e=>[e.fn,e.i]))});
+            window.advancePoll=async seconds=>{for(let i=0;i<seconds;i++){if(timer)timer();for(let j=0;j<100;j++)await Promise.resolve();}};
             window.interfaces=[{interface:'wan',proto:'dhcp',up:true,device:'eth1',route:[{target:'0.0.0.0',mask:0}]}];
             const wireless={radio0:{up:true,config:{band:'2g'},interfaces:[{section:'default_radio0',ifname:'phy0-ap0',config:{ssid:'Test'},iwinfo:{channel:6,frequency:2437,txpower:20,noise:-90}}]}};
             window.makeApp=()=>new Function('view','rpc','poll','fs','E','L','document',${JSON.stringify(source)})(
@@ -60,7 +67,7 @@ test('dashboard preferences work with native controls, keyboard, persistence and
                     return Promise.resolve(key==='system.board'?{hostname:'Test router'}:key==='system.info'?{memory:{total:1024,available:512},root:{total:1024,used:128}}:
                         key==='network.interface.dump'?{interface:interfaces}:key==='network.wireless.status'||key==='luci-rpc.getWirelessDevices'?structuredClone(wireless):
                         key==='iwinfo.assoclist'?{results:[]}:key==='luci.getRealtimeStats'?[[1,100,0,50],[4,400,0,200]]:{});
-                }},{add:(fn,seconds)=>polls.set(fn,seconds),remove:fn=>polls.delete(fn)},{read:()=>Promise.resolve('cpu 100 0 0 200')},E,
+                }},nativePoll,{read:()=>Promise.resolve('cpu 100 0 0 200')},E,
                 {url:x=>'/cgi-bin/luci/'+x,resource:()=>new URL('dashboard.css',location.href).href},document);
             window.mount=async()=>{window.app=makeApp();document.getElementById('mount').replaceChildren(app.render(await app.load()));};
             await mount();
@@ -70,6 +77,9 @@ test('dashboard preferences work with native controls, keyboard, persistence and
             return true;
         })()`);
         assert.deepEqual(await evaluate('[...polls.values()]'),[10]);
+        await evaluate('advancePoll(10)');
+        assert.match(await evaluate('document.querySelector("[data-nova=rate-down]").textContent'),/bit\/s/);
+        assert.match(await evaluate('document.querySelector(".nv-updated").textContent'),/已刷新/);
         assert.equal(await evaluate('document.querySelectorAll("[data-nova-card][hidden]").length'),0);
         // Enter activates a focused native summary, rather than a custom JS toggle.
         await evaluate(`window.activationEvents=[];for(const type of ['keydown','keypress','keyup','click'])document.addEventListener(type,event=>activationEvents.push({type:event.type,trusted:event.isTrusted,tag:event.target.tagName,key:event.key}));`);
@@ -91,10 +101,13 @@ test('dashboard preferences work with native controls, keyboard, persistence and
         // An inventory rebuild preserves an open picker and focused checkbox.
         await evaluate('(async()=>{option("memory").focus();interfaces=[{...interfaces[0],"ipv4-address":[{address:"203.0.113.10"}]}];await [...polls.keys()][0]();})()');
         assert.equal(await evaluate('document.activeElement===option("memory") && document.querySelector(".nv-controls details").open && card("cpu").hidden'),true);
+        assert.equal(await evaluate('typeof app._novaSampleRates'), 'function');
+        assert.deepEqual(await evaluate('[...polls.values()]'),[10]);
         await evaluate('changeInterval("30")');assert.deepEqual(await evaluate('[...polls.values()]'),[30]);
         await evaluate('changeInterval("0")');assert.equal(await evaluate('polls.size'),0);
         assert.match(await evaluate('document.querySelector(".nv-updated").textContent'),/已暂停/);
         await evaluate('changeInterval("60")');assert.deepEqual(await evaluate('[...polls.values()]'),[60]);
+        assert.match(await evaluate('document.querySelector(".nv-updated").textContent'),/已刷新/);
         await evaluate('Object.defineProperty(document,"hidden",{configurable:true,value:true});document.dispatchEvent(new Event("visibilitychange"))');
         assert.equal(await evaluate('polls.size'),0);
         await evaluate('Object.defineProperty(document,"hidden",{configurable:true,value:false});document.dispatchEvent(new Event("visibilitychange"))');

@@ -2,7 +2,7 @@
 
 Nova is a dark LuCI theme with a built-in status dashboard for OpenWrt and ImmortalWrt.
 
-> Preview 0.3.0: one theme package with the built-in Dashboard, detected interface cards, live PPPoE status and searchable native LuCI lists. This is still experimental and has not been tested on every router or firmware. Keep Bootstrap installed for safe rollback.
+> Preview 0.3.1: one theme package with the built-in Dashboard, detected interface cards, live PPPoE status and searchable native LuCI lists. This is still experimental and has not been tested on every router or firmware. Keep Bootstrap installed for safe rollback.
 
 ## Package
 
@@ -40,12 +40,12 @@ key. For an existing installation, [remove the old standalone Dashboard first](d
 
 For **opkg**:
 ```sh
-opkg install /tmp/luci-theme-nova_0.3.0-r1_all.ipk
+opkg install /tmp/luci-theme-nova_0.3.1-r1_all.ipk
 ```
 
 For **apk**, after the package is signed and its publisher key is already trusted:
 ```sh
-apk add /tmp/luci-theme-nova-0.3.0-r1.apk
+apk add /tmp/luci-theme-nova-0.3.1-r1.apk
 ```
 
 The Dashboard is included and keeps its existing **Nova Dashboard / Nova 仪表盘**
@@ -142,6 +142,12 @@ rejects that mistake. To run the same comparison locally, set
 ## License
 
 Project-authored files: MIT. Templates adapted from the LuCI Bootstrap theme retain their upstream Apache-2.0 notices.
+
+## What's new in 0.3.1
+
+- Fix Dashboard polling on initial load, inventory rebuild and pause/resume with
+  LuCI's synchronous first poll tick. Test against the unchanged upstream Poll
+  implementation from both OpenWrt 24.10 and 25.12.
 
 ## What's new in 0.3.0
 

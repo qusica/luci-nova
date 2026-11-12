@@ -37,9 +37,9 @@ apk info -e luci-app-nova-dashboard
 apk del --simulate luci-app-nova-dashboard
 # Continue only if it removes the old app, without unrelated package removals:
 apk del luci-app-nova-dashboard
-apk add --simulate /tmp/luci-theme-nova-0.3.0-r1.apk
+apk add --simulate /tmp/luci-theme-nova-0.3.1-r1.apk
 # Continue only if it installs/upgrades Nova and retains Bootstrap/native LuCI:
-apk add /tmp/luci-theme-nova-0.3.0-r1.apk
+apk add /tmp/luci-theme-nova-0.3.1-r1.apk
 ```
 
 Skip the `apk del` steps if the standalone app is not installed. APK normally
@@ -54,7 +54,7 @@ removals, stop and inspect the full package state. Do not infer the cause from
 opkg list-installed luci-app-nova-dashboard
 # Only if the old app is installed:
 opkg remove luci-app-nova-dashboard
-opkg install /tmp/luci-theme-nova_0.3.0-r1_all.ipk
+opkg install /tmp/luci-theme-nova_0.3.1-r1_all.ipk
 ```
 
 Check command output before continuing. If an unrelated package depends on the
@@ -71,7 +71,7 @@ Installing Nova does not select the theme or change the home route. Dashboard
 is bundled even when Bootstrap is selected; there is no monitoring daemon.
 
 If the page still shows old assets, hard-reload the browser. Dashboard and theme
-assets now share the package's `0.3.0` versioned cache key. Firmware may also
+assets now share the package's versioned cache key. Firmware may also
 require refreshing its LuCI menu/rpcd session caches after installing packages;
 use the firmware's normal procedure rather than editing permissions.
 
