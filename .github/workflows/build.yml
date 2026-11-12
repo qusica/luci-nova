@@ -58,6 +58,14 @@ jobs:
           FEEDNAME: nova
           PACKAGES: luci-theme-nova
           BUILD_LOG: 1
+      - name: Install host opkg build dependencies (test only)
+        if: matrix.ext == 'ipk'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends build-essential cmake pkg-config git
+      - name: Build pinned host opkg tool (test only)
+        if: matrix.ext == 'ipk'
+        run: bash scripts/build-host-opkg.sh "$RUNNER_TEMP/nova-host-opkg"
       - name: Test actual built IPK assets and metadata
         if: matrix.ext == 'ipk'
         shell: bash
@@ -66,6 +74,8 @@ jobs:
           mapfile -d '' themes < <(find bin/packages -type f -name 'luci-theme-nova_*.ipk' -print0)
           test "${#themes[@]}" -eq 1
           bash scripts/test-built-ipks.sh "${themes[0]}" "$RUNNER_TEMP/nova-built-ipk-assets-test"
+          bash scripts/test-ipk-migration.sh "$RUNNER_TEMP/nova-host-opkg/build/src/opkg-cl" \
+            "${themes[0]}" "$RUNNER_TEMP/nova-ipk-migration-test"
       - name: Install host APK build dependencies (test only)
         if: matrix.ext == 'apk'
         run: |

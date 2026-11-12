@@ -25,6 +25,16 @@ test('dashboard preferences work with native controls, keyboard, persistence and
             return result.result.value;
         }
         await send('Page.enable');
+        await send('Page.bringToFront');
+        // CDP keyDown without text becomes rawKeyDown. Native HTML activation
+        // (unlike JS keydown handlers) needs the corresponding keypress too.
+        async function press(key,code,virtualKey,text){
+            await send('Input.dispatchKeyEvent',{type:'keyDown',key,code,windowsVirtualKeyCode:virtualKey,nativeVirtualKeyCode:virtualKey,text,unmodifiedText:text});
+            await send('Input.dispatchKeyEvent',{type:'keyUp',key,code,windowsVirtualKeyCode:virtualKey,nativeVirtualKeyCode:virtualKey});
+        }
+        async function focus(selector){
+            assert.equal(await evaluate(`(()=>{const e=document.querySelector(${JSON.stringify(selector)});e.focus();return document.activeElement===e;})()`),true,'focus '+selector);
+        }
         for(let i=0;i<100;i++){
             if(await evaluate('!!document.getElementById("mount") && document.readyState === "complete"'))break;
             await new Promise(resolve=>setTimeout(resolve,20));
@@ -62,16 +72,21 @@ test('dashboard preferences work with native controls, keyboard, persistence and
         assert.deepEqual(await evaluate('[...polls.values()]'),[10]);
         assert.equal(await evaluate('document.querySelectorAll("[data-nova-card][hidden]").length'),0);
         // Enter activates a focused native summary, rather than a custom JS toggle.
-        await evaluate('document.querySelector(".nv-controls summary").focus()');
-        await send('Input.dispatchKeyEvent',{type:'keyDown',key:'Enter',code:'Enter',windowsVirtualKeyCode:13});
-        await send('Input.dispatchKeyEvent',{type:'keyUp',key:'Enter',code:'Enter',windowsVirtualKeyCode:13});
+        await evaluate(`window.activationEvents=[];for(const type of ['keydown','keypress','keyup','click'])document.addEventListener(type,event=>activationEvents.push({type:event.type,trusted:event.isTrusted,tag:event.target.tagName,key:event.key}));`);
+        await focus('.nv-controls summary');
+        await press('Enter','Enter',13,'\r');
         assert.equal(await evaluate('document.querySelector(".nv-controls details").open'),true);
-        await evaluate('option("cpu").focus()');
-        await send('Input.dispatchKeyEvent',{type:'keyDown',key:' ',code:'Space',windowsVirtualKeyCode:32});
-        await send('Input.dispatchKeyEvent',{type:'keyUp',key:' ',code:'Space',windowsVirtualKeyCode:32});
+        assert.equal(await evaluate(`activationEvents.some(e=>e.type==='keypress' && e.key==='Enter' && e.trusted && e.tag==='SUMMARY') && activationEvents.some(e=>e.type==='click' && e.trusted && e.tag==='SUMMARY')`),true,'native trusted summary activation');
+        await press('Enter','Enter',13,'\r');
+        assert.equal(await evaluate('document.querySelector(".nv-controls details").open'),false);
+        await press(' ','Space',32,' ');
+        assert.equal(await evaluate('document.querySelector(".nv-controls details").open'),true);
+        await focus('[data-nova-card-option="cpu"]');
+        await press(' ','Space',32,' ');
         assert.equal(await evaluate('getComputedStyle(card("cpu")).display'),'none');
         assert.equal(await evaluate('document.querySelector(".nv-wifi details").open'),false);
-        await evaluate('document.querySelector(".nv-wifi summary").click()');
+        await focus('.nv-wifi summary');
+        await press(' ','Space',32,' ');
         assert.equal(await evaluate('document.querySelector(".nv-wifi details").open && document.querySelector(".nv-wifi-stats").getBoundingClientRect().height>0'),true);
         // An inventory rebuild preserves an open picker and focused checkbox.
         await evaluate('(async()=>{option("memory").focus();interfaces=[{...interfaces[0],"ipv4-address":[{address:"203.0.113.10"}]}];await [...polls.keys()][0]();})()');
@@ -88,7 +103,8 @@ test('dashboard preferences work with native controls, keyboard, persistence and
         assert.equal(await evaluate('card("cpu").hidden'),true);assert.deepEqual(await evaluate('[...polls.values()]'),[60]);
         await evaluate('document.querySelectorAll(".nv-card-options input").forEach(e=>{if(e.checked)e.click()})');
         assert.equal(await evaluate('polls.size'),0);assert.equal(await evaluate('document.querySelector(".nv-empty").hidden'),false);
-        await evaluate('document.querySelector(".nv-reset").click()');
+        await focus('.nv-reset');
+        await press('Enter','Enter',13,'\r');
         assert.deepEqual(await evaluate('[...polls.values()]'),[10]);assert.equal(await evaluate('document.querySelectorAll("[data-nova-card][hidden]").length'),0);
         for(const width of [390,700,1400]){
             await send('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:false});

@@ -92,10 +92,11 @@ The output suffix (`.ipk` or `.apk`) is decided by the SDK. Prefer official vers
 Run the dependency-free dashboard rendering tests with Node.js 18 or newer:
 
 ```sh
-node --test tests/dashboard.test.js tests/native-lists.test.js tests/navigation.test.js tests/menu-localization.test.js tests/package-integration.test.js
+node --test tests/dashboard.test.js tests/native-lists.test.js tests/navigation.test.js tests/menu-localization.test.js tests/package-integration.test.js tests/page-search.test.js tests/page-search-interaction.test.js
 node --test tests/asset-version.test.js
 node --check luci-theme-nova/htdocs/luci-static/resources/view/nova/dashboard.js
 node --check luci-theme-nova/htdocs/luci-static/nova/nova-shell.js
+node --check luci-theme-nova/htdocs/luci-static/nova/nova-search.js
 ```
 
 These tests exercise LuCI rendering with DOM/RPC doubles. They do not replace
@@ -109,6 +110,7 @@ CHROME_BIN=google-chrome node --test tests/browser-layout.test.js
 CHROME_BIN=google-chrome node --test tests/navigation-browser.test.js
 CHROME_BIN=google-chrome node --test tests/native-lists-browser.test.js
 CHROME_BIN=google-chrome node --test tests/visual-browser.test.js
+CHROME_BIN=google-chrome node --test tests/dashboard-preferences-browser.test.js tests/page-search-browser.test.js
 ```
 
 When running all four browser files together, pass `--test-concurrency=1` to Node.

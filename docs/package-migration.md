@@ -94,7 +94,7 @@ part of either Nova package and is not removed by this migration.
 Source tests check one-package ownership, preserved route/ACL identities,
 read-only access, native-home selection and removal-hook cases. Actual built
 IPK checks inspect metadata (including conflict), payloads, translations and
-browser regressions. Actual built APK checks additionally exercise clean install,
+browser regressions. Both package managers additionally exercise clean install,
 old-app conflict, remove-first migration, upgrade and uninstall in disposable
 roots with native-file sentinels:
 
@@ -102,11 +102,16 @@ roots with native-file sentinels:
 bash scripts/test-built-ipks.sh THEME.ipk NEW_STAGE
 bash scripts/test-built-apks.sh APK THEME.apk NEW_STAGE
 bash scripts/test-package-migration.sh APK THEME.apk NEW_STAGE OLD_THEME.apk OLD_DASHBOARD.apk
+bash scripts/build-host-opkg.sh NEW_BUILD_DIR
+bash scripts/test-ipk-migration.sh OPKG THEME.ipk NEW_STAGE OLD_THEME.ipk OLD_DASHBOARD.ipk
 ```
 
-Without historical APK arguments the migration script uses clearly labelled
+Without historical package arguments the migration scripts use clearly labelled
 synthetic legacy fixtures. Core dependencies are inert stubs, hooks and network
 are disabled, and untrusted packages are allowed only in isolated test roots.
-These checks do not change router trust, execute firmware service hooks, or
-replace live acceptance. IPK archive checks alone are not an opkg solver or live
-router migration test. Real-device acceptance remains required before release.
+These checks do not change router trust or replace live acceptance. APK disables
+package hooks and opkg offline mode skips them. The actual packaged removal hook
+is separately executed with mocked UCI and template presence to cover selected
+Nova, another theme, upgrade/replacement and offline-image cases. Firmware
+service hooks and actual router lifecycle remain unverified. Real-device
+acceptance is required before release.
