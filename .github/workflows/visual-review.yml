@@ -19,7 +19,7 @@ jobs:
         env:
           NOVA_ASSET_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: |
-          node --test tests/dashboard.test.js tests/native-lists.test.js tests/navigation.test.js tests/menu-localization.test.js tests/package-integration.test.js tests/asset-version.test.js
+          node --test tests/dashboard.test.js tests/native-lists.test.js tests/navigation.test.js tests/menu-localization.test.js tests/package-integration.test.js tests/page-search.test.js tests/page-search-interaction.test.js tests/asset-version.test.js
       - name: Review responsive design and interactions
         env:
           NOVA_SCREENSHOT_DIR: ${{ runner.temp }}/nova-visual-review
@@ -27,7 +27,7 @@ jobs:
         run: |
           mkdir -p "$XDG_CACHE_HOME/fontconfig"
           fc-cache
-          node --test --test-concurrency=1 tests/browser-layout.test.js tests/navigation-browser.test.js tests/native-lists-browser.test.js tests/visual-browser.test.js tests/native-spacing-browser.test.js tests/sidebar-overflow-browser.test.js
+          node --test --test-concurrency=1 tests/browser-layout.test.js tests/navigation-browser.test.js tests/native-lists-browser.test.js tests/visual-browser.test.js tests/native-spacing-browser.test.js tests/sidebar-overflow-browser.test.js tests/dashboard-preferences-browser.test.js tests/page-search-browser.test.js
       - name: Upload synthetic design review screenshots
         if: always()
         uses: actions/upload-artifact@v4

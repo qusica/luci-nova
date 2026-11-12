@@ -133,10 +133,11 @@ done
 node --check "$stage/luci-theme-nova/htdocs/luci-static/resources/view/nova/dashboard.js"
 node --check "$stage/luci-theme-nova/htdocs/luci-static/nova/nova-shell.js"
 node --check "$stage/luci-theme-nova/htdocs/luci-static/nova/nova-lists.js"
-node --test "$stage/tests/dashboard.test.js" "$stage/tests/native-lists.test.js" "$stage/tests/navigation.test.js" "$stage/tests/menu-localization.test.js" "$stage/tests/package-integration.test.js"
+node --check "$stage/luci-theme-nova/htdocs/luci-static/nova/nova-search.js"
+node --test "$stage/tests/dashboard.test.js" "$stage/tests/native-lists.test.js" "$stage/tests/navigation.test.js" "$stage/tests/menu-localization.test.js" "$stage/tests/package-integration.test.js" "$stage/tests/page-search.test.js" "$stage/tests/page-search-interaction.test.js"
 export XDG_CACHE_HOME="$stage/browser-cache"
 mkdir -p "$XDG_CACHE_HOME/fontconfig"
 if command -v fc-cache >/dev/null 2>&1; then
     fc-cache
 fi
-node --test --test-concurrency=1 "$stage/tests/browser-layout.test.js" "$stage/tests/native-lists-browser.test.js" "$stage/tests/navigation-browser.test.js" "$stage/tests/visual-browser.test.js" "$stage/tests/native-spacing-browser.test.js" "$stage/tests/sidebar-overflow-browser.test.js"
+node --test --test-concurrency=1 "$stage/tests/browser-layout.test.js" "$stage/tests/native-lists-browser.test.js" "$stage/tests/navigation-browser.test.js" "$stage/tests/visual-browser.test.js" "$stage/tests/native-spacing-browser.test.js" "$stage/tests/sidebar-overflow-browser.test.js" "$stage/tests/dashboard-preferences-browser.test.js" "$stage/tests/page-search-browser.test.js"

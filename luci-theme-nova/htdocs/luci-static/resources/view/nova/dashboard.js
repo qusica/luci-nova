@@ -7,6 +7,33 @@
 // Keep in sync with PKG_VERSION; tests enforce this cache key on every release.
 var dashboardAssetVersion = '0.3.0';
 
+// Preferences are presentation-only and scoped to this browser, never UCI.
+var preferenceKey = 'nova.dashboard.preferences.v1';
+var cardNames = {'rate-down':'上行链路','cpu':'CPU','memory':'内存','wifi':'Wi-Fi 概览','signal':'信号强度','disk':'存储',
+    'topology':'网络路径','traffic':'吞吐量','band-24':'2.4 GHz','band-5':'5 GHz','band-6':'6 GHz','band-other':'无线（频段未知）'};
+function preferences(value) {
+    var result = {interval:10, hidden:[]};
+    if (!object(value)) return result;
+    if ([0,10,30,60].indexOf(value.interval) !== -1) result.interval=value.interval;
+    if (Array.isArray(value.hidden)) result.hidden=Object.keys(cardNames).filter(function(key){return value.hidden.indexOf(key)!==-1;});
+    return result;
+}
+function readPreferences() {
+    try {
+        var raw=document.defaultView.localStorage.getItem(preferenceKey);
+        return preferences(raw && raw.length<=2048 ? JSON.parse(raw) : null);
+    } catch(error) { return preferences(null); }
+}
+function writePreferences(value) {
+    try { document.defaultView.localStorage.setItem(preferenceKey,JSON.stringify(preferences(value))); return true; }
+    catch(error) { return false; }
+}
+function disclosure(title, contents, open) {
+    var element=E('details',{'class':'nv-disclosure'},[E('summary',{},title)].concat(children(contents)));
+    element.open=!!open;
+    return element;
+}
+
 var getBoard = rpc.declare({ object: 'system', method: 'board' });
 var getInfo = rpc.declare({ object: 'system', method: 'info' });
 // Do not default failed detection to an empty inventory. LuCI RPC otherwise
@@ -294,12 +321,12 @@ function wifiCard(band,g){
         el('div','nv-wifi-main',[el('strong','', ch ? '信道 '+ch : '—'), E('span',{},f?f+' GHz':'无线信息不可用')]),
         el('div','nv-band-meter',[E('span',{'style':'width:'+Math.max(0,Math.min(100,number(ch)*1.25))+'%'})]),
         el('div','nv-band-caption',[el('span','',wifiSummary(g))]),
-        el('div','nv-wifi-stats',[
+        disclosure(bandName(band)+' 详细信息', [el('div','nv-wifi-stats',[
             detailLine('客户端',g.every(function(n){return n.known;}) ? String(count) : '不可用'),
             detailLine('发射功率', tx != null ? tx+' dBm' : '—'),
             detailLine('噪声', noise != null ? noise+' dBm' : '—'),
             detailLine('接口', net&&net.getIfname&&net.getIfname() || '—')
-        ]),
+        ])]),
         el('div','nv-mini-chart',[
             svg('svg',{'viewBox':'0 0 360 76','preserveAspectRatio':'none','aria-label':bandName(band)+' 实时吞吐量'},[
                 svg('line',{'x1':'0','y1':'65','x2':'360','y2':'65','class':'nv-axis'}),
@@ -361,8 +388,8 @@ function fillChart(raw,downPath,upPath,downRate,upRate,peakLabel){
     var p=Math.max(1024,Math.max.apply(Math,lines.down.concat(lines.up,[0]))*1.2);
     if(downPath)downPath.setAttribute('points',points(lines.down,p,600,145));
     if(upPath)upPath.setAttribute('points',points(lines.up,p,600,145));
-    attrValue(downRate,lines.down.length?rate(lines.down[lines.down.length-1]):'等待采样');
-    attrValue(upRate,lines.up.length?rate(lines.up[lines.up.length-1]):'等待采样');
+    attrValue(downRate,lines.down.length?rate(lines.down[lines.down.length-1]):'采样不可用');
+    attrValue(upRate,lines.up.length?rate(lines.up[lines.up.length-1]):'采样不可用');
     attrValue(peakLabel,lines.down.length||lines.up.length?rate(p/1.2):'—');
 }
 return view.extend({
@@ -379,6 +406,8 @@ return view.extend({
         });
     },
     render:function(data){
+        if(this._novaCleanup)this._novaCleanup();
+        var prefs=this._novaPreferences || (this._novaPreferences=readPreferences());
         var board=data[0]||{}, sys=data[1]||{}, entries=(data[2]||{}).interface||[];
         var nets=data[3]||[], cpuRaw=data[5],tempRaw=data[6],assocs=data[7]||[];
         var detected=data[8] || {interfaces:!!data[2],wireless:Array.isArray(data[3])};
@@ -451,10 +480,10 @@ return view.extend({
                 el('div','nv-panel-title',[el('span','nv-head-icon',icon('path')),el('strong','', '网络路径')]),
                 el('span','nv-muted','点击节点查看详情')
             ]),
-            el('div','nv-path-scroll',[
+            disclosure('网络路径详情', [el('div','nv-path-scroll',[
                 el('div','nv-path'+(wan?'':' nv-no-wan')+(channels.length?'':' nv-no-branches'),path)
             ]),
-            E('div',{'id':'nv-selected','class':'nv-node-detail','hidden':true}),
+            E('div',{'id':'nv-selected','class':'nv-node-detail','hidden':true})],true),
             pathStats.length ? el('div','nv-path-stats',pathStats) : null
         ]);
         var header=el('div','nv-overview-head',[
@@ -463,7 +492,7 @@ return view.extend({
                 E('h2',{}, !detected.interfaces ? '接口状态暂不可用' : wan ? (conn?'上行链路已连接':'上行链路'+wanState(wan)) : '本地网络概览'),
                 el('p','',model+' · '+firmware+(nets.length?' · '+(clientsKnown?totalClients+' 个无线客户端':'无线客户端数不可用'):''))
             ]),
-            E('span',{'class':'nv-updated'},[dot(),'实时 · 每 3 秒更新'])
+            E('span',{'class':'nv-updated'},'等待刷新')
         ]);
         var cards=el('div','nv-metric-grid',[
             wan ? metric('上行链路',!detected.interfaces?'状态未知':conn?'↓ 等待采样':status,wanLabel(wan)+(wanDev?' · '+wanDev:''),'rate-down') : null,
@@ -498,8 +527,50 @@ return view.extend({
         var panels=shownBands.map(function(band){return wifiCard(band,groups[band]);});
         if(wan)panels.unshift(trend);
         var bottom=panels.length ? el('div','nv-bottom-grid',panels) : null;
-        var notice=warnings.length ? E('p',{'class':'nv-detection-warning','role':'status'},warnings.join('；')+'。正在自动重试。') : null;
-        var root=E('div',{'class':'nova-dashboard'},children([header,notice,cards,mainCard,bottom]));
+        var notice=warnings.length ? E('p',{'class':'nv-detection-warning','role':'status'},warnings.join('；')+'。数据可能已过期，请恢复刷新后重试。') : null;
+        var registry=[];
+        Array.prototype.forEach.call(cards.children,function(card){
+            var value=card.querySelector('[data-nova=cpu]') || card.querySelector('[data-nova=memory]') || card.querySelector('[data-nova=disk]') ||
+                card.querySelector('[data-nova=wifi]') || card.querySelector('[data-nova=signal]') || card.querySelector('[data-nova=rate-down]');
+            if(value)registry.push({key:value.getAttribute('data-nova'),node:card});
+        });
+        registry.push({key:'topology',node:mainCard});
+        if(wan)registry.push({key:'traffic',node:trend});
+        shownBands.forEach(function(band,i){registry.push({key:'band-'+band.replace('.',''),node:panels[i+(wan?1:0)]});});
+        var storageNote=E('span',{'class':'nv-preference-note','role':'status'},'仅保存在当前浏览器');
+        var empty=E('p',{'class':'nv-empty','hidden':true},'所有卡片已隐藏。展开“自定义卡片”选择卡片，或恢复默认。');
+        function save(){storageNote.textContent=writePreferences(prefs)?'已保存在当前浏览器':'浏览器无法保存，偏好仅在本次页面有效';}
+        var picker=disclosure('自定义卡片',[
+            E('fieldset',{'class':'nv-card-options'},[E('legend',{},'显示的卡片')].concat(registry.map(function(item){
+                var key=item.key;
+                var input=E('input',{'type':'checkbox','data-nova-card-option':key,
+                    'change':function(event){
+                        prefs.hidden=prefs.hidden.filter(function(k){return k!==key;});
+                        if(!event.target.checked)prefs.hidden.push(key);
+                        save();applyPreferences();configurePoll();
+                    }});
+                input.checked=prefs.hidden.indexOf(key)===-1;
+                return E('label',{},[input,document.createTextNode(cardNames[key])]);
+            }))),storageNote
+        ]);
+        var interval=E('select',{'id':'nv-refresh-interval','change':function(event){
+            prefs.interval=preferences({interval:Number(event.target.value)}).interval;
+            save();configurePoll();
+        }},[0,10,30,60].map(function(seconds){return E('option',{'value':String(seconds)},seconds?seconds+' 秒':'暂停');}));
+        interval.value=String(prefs.interval);
+        var reset=E('button',{'type':'button','class':'nv-reset','click':function(){
+            prefs.interval=10;prefs.hidden=[];interval.value='10';
+            Array.prototype.forEach.call(picker.querySelectorAll('input'),function(input){input.checked=true;});
+            save();applyPreferences();configurePoll();
+        }},'恢复默认');
+        var controls=el('div','nv-controls',[picker,E('label',{'for':'nv-refresh-interval'},'刷新间隔'),interval,reset,
+            E('a',{'href':L.url('admin/status/overview')},'原生状态概览 →')]);
+        var root=E('div',{'class':'nova-dashboard'},children([header,controls,notice,empty,cards,mainCard,bottom]));
+        function applyPreferences(){
+            registry.forEach(function(card){card.node.hidden=prefs.hidden.indexOf(card.key)!==-1;card.node.setAttribute('data-nova-card',card.key);});
+            empty.hidden=registry.some(function(card){return !card.node.hidden;});
+        }
+        applyPreferences();
         var styleHref=L.resource('nova/dashboard.css')+'?v='+dashboardAssetVersion;
         var style=document.getElementById('nova-dashboard-style');
         if(!style){
@@ -518,9 +589,14 @@ return view.extend({
                 detected:d[8]
             });
         }
-        var lastSignature=signature(data), updating=false;
-        function refresh(){
+        var lastSignature=signature(data), updating=false, sampling=false, epoch=0;
+        function visible(key){return registry.some(function(card){return card.key===key && !card.node.hidden;});}
+        function enabled(){return prefs.interval!==0 && !document.hidden && registry.some(function(card){return !card.node.hidden;});}
+        function current(token){return root.isConnected && self._novaPoll===update && enabled() && token===epoch;}
+        function refreshStatus(message){attrValue(root.querySelector('.nv-updated'),message);}
+        function refresh(token){
             return readDetection().then(function(d){
+                if(!current(token))return false;
                 var next=data.slice();
                 next[8]={interfaces:d[0]!==null,wireless:d[1]!==null,errors:d[2],interfacesConfigured:!!data[8].interfacesConfigured,wirelessConfigured:!!data[8].wirelessConfigured};
                 if(d[0]!==null){next[2]=d[0];next[8].interfacesConfigured=false;}
@@ -529,43 +605,64 @@ return view.extend({
                 else if(d[4]!==null && (!next[9] || next[8].wirelessConfigured)){next[9]=d[4];next[3]=wifiNetworks(d[4]);next[8].wirelessConfigured=true;}
                 return readStations(next[3]).then(function(stations){
                     next[7]=stations;
-                    if(!root.isConnected || self._novaPoll!==update)return false;
+                    if(!current(token))return false;
                     if(signature(next)===lastSignature)return true;
                     // Preserve selection/focus across a topology change. Never
                     // re-use WAN rates after a PPP device/name switch.
+                    var active=document.activeElement;
+                    var activeCard=active && active.getAttribute && active.getAttribute('data-nova-card-option');
+                    var activeId=active && active.getAttribute && active.getAttribute('id');
+                    var activeSummary=active && active.tagName==='SUMMARY' ? active.textContent : null;
+                    var activeReset=active && active===reset;
                     var selected=root.querySelector('.nv-node:focus');
                     var detail=document.getElementById('nv-selected');
                     var title=selected&&selected.getAttribute('data-nova-node');
                     var detailKey=detail&&!detail.hidden&&detail.getAttribute('data-nova-node');
+                    var disclosureStates={};
+                    Array.prototype.forEach.call(root.querySelectorAll('.nv-disclosure'),function(d){disclosureStates[d.children[0].textContent]=d.open;});
                     var replacement=self.render(next);
+                    Array.prototype.forEach.call(replacement.querySelectorAll('.nv-disclosure'),function(d){var key=d.children[0].textContent;if(Object.prototype.hasOwnProperty.call(disclosureStates,key))d.open=disclosureStates[key];});
                     root.replaceWith(replacement);
                     Array.prototype.forEach.call(replacement.querySelectorAll('.nv-node'),function(n){
                         if(detailKey && n.getAttribute('data-nova-node')===detailKey)n.click();
                         if(title && n.getAttribute('data-nova-node')===title)n.focus();
                     });
+                    Array.prototype.forEach.call(replacement.querySelectorAll('input'),function(input){if(activeCard && input.getAttribute('data-nova-card-option')===activeCard)input.focus();});
+                    if(activeId==='nv-refresh-interval')document.getElementById(activeId).focus();
+                    if(activeReset)replacement.querySelector('.nv-reset').focus();
+                    Array.prototype.forEach.call(replacement.querySelectorAll('.nv-disclosure'),function(d){if(activeSummary && d.children[0].textContent===activeSummary)d.children[0].focus();});
                     return self._novaSampleRates().then(function(){return false;});
                 });
             });
         }
         function sampleRates(){
+            var token=epoch;
+            if(sampling || !current(token))return Promise.resolve();
+            sampling=true;
+            var statsNeeded=visible('memory') || visible('disk'),cpuNeeded=visible('cpu');
+            var wanNeeded=visible('rate-down') || visible('traffic') || visible('topology');
             var tasks=[
-                safe(getInfo(),{}),
-                safe(fs.read('/proc/stat'),null),
-                conn&&wanDev&&detected.interfaces?safe(getRealtime('interface',wanDev),[]):Promise.resolve([])
+                statsNeeded?safe(getInfo(),null):Promise.resolve(null),
+                cpuNeeded?safe(fs.read('/proc/stat'),null):Promise.resolve(null),
+                wanNeeded&&conn&&wanDev&&detected.interfaces?safe(getRealtime('interface',wanDev),[]):Promise.resolve([])
             ];
             wifiDevs.forEach(function(item){
                 var n=item.net,ifname=n&&n.getIfname&&n.getIfname();
-                tasks.push(detected.wireless&&n.isUp()&&!n.isDisabled()&&ifname?safe(getRealtime('interface',ifname),[]):Promise.resolve([]));
+                tasks.push(visible('band-'+item.id)&&detected.wireless&&n.isUp()&&!n.isDisabled()&&ifname?safe(getRealtime('interface',ifname),[]):Promise.resolve([]));
             });
             return Promise.all(tasks).then(function(v){
-                if(!root.isConnected || self._novaPoll!==update)return;
+                if(!current(token))return;
                 var info=v[0]||{},mem=info.memory||{},rootfs=info.root||{};
+                refreshStatus(((statsNeeded && (!mem.total || !rootfs.total)) || (cpuNeeded && !getCpuSample(v[1])) || (nets.length && !clientsKnown) || !detected.interfaces || !detected.wireless || (wanNeeded && conn && !parseGraphRows(v[2]).down.length) || wifiDevs.some(function(item,i){return visible('band-'+item.id) && item.net.isUp() && !item.net.isDisabled() && !parseGraphRows(v[3+i]).down.length;}) ? '部分数据不可用 · ' : '已刷新 · ')+new Date().toLocaleTimeString());
+                if(!mem.total)attrValue(root.querySelector('[data-nova=memory]'),'不可用');
+                if(!rootfs.total)attrValue(root.querySelector('[data-nova=disk]'),'不可用');
                 var sample=getCpuSample(v[1]);
                 if(sample&&prevSample&&sample.total>prevSample.total){
                     var busy=1-((sample.idle-prevSample.idle)/(sample.total-prevSample.total));
                     attrValue(root.querySelector('[data-nova=cpu]'),Math.round(Math.max(0,Math.min(1,busy))*100)+'%');
                 }
-                prevSample=sample||prevSample;
+                if(cpuNeeded && (!sample || !prevSample))attrValue(root.querySelector('[data-nova=cpu]'),sample?'等待采样':'不可用');
+                prevSample=sample;
                 self._novaCpuSample=prevSample;
                 if(mem.total){
                     var used=number(mem.total)-number(mem.available!=null?mem.available:mem.free);
@@ -574,6 +671,9 @@ return view.extend({
                 if(rootfs.total)attrValue(root.querySelector('[data-nova=disk]'),'已用 '+percent(rootfs.used,rootfs.total)+'%');
                 var chart=parseGraphRows(v[2]),lastDown=chart.down.length?chart.down[chart.down.length-1]:null;
                 var lastUp=chart.up.length?chart.up[chart.up.length-1]:null;
+                if(lastDown==null && conn && detected.interfaces){
+                    ['rate-down','path-download','path-flow'].forEach(function(key){attrValue(root.querySelector('[data-nova='+key+']'),'采样不可用');});
+                }
                 if(lastDown!=null){
                     attrValue(root.querySelector('[data-nova=rate-down]'),'↓ '+rate(lastDown));
                     attrValue(root.querySelector('[data-nova=traffic-up]'),'↑ '+rate(lastUp));
@@ -593,22 +693,45 @@ return view.extend({
                     var pl=root.querySelector('[data-nova=wifi-'+id+']');
                     if(pl)pl.setAttribute('points',points(rows.down,p,360,65));
                     var last=rows.down.length ? rows.down[rows.down.length-1] : null;
-                    attrValue(root.querySelector('[data-nova=wifi-rate-'+id+']'),last!=null?'↓ '+rate(last):!detected.wireless?'检测失败':item.net.isUp()?'等待采样':'接口未连接');
+                    attrValue(root.querySelector('[data-nova=wifi-rate-'+id+']'),last!=null?'↓ '+rate(last):!detected.wireless?'检测失败':item.net.isUp()?'采样不可用':'接口未连接');
                 });
-            });
+            }).finally(function(){sampling=false;});
         }
         function update(){
-            if(updating || !root.isConnected || self._novaPoll!==update)return Promise.resolve();
+            if(!root.isConnected && self._novaPoll===update){self.remove();return Promise.resolve();}
+            if(updating || sampling || !current(epoch))return Promise.resolve();
             updating=true;
-            return refresh().then(function(unchanged){if(unchanged)return sampleRates();}).finally(function(){updating=false;});
+            var token=epoch;
+            return refresh(token).then(function(unchanged){if(unchanged && current(token))return sampleRates();}).catch(function(){
+                if(current(token))refreshStatus('刷新失败 · 当前数据可能已过期');
+            }).finally(function(){updating=false;});
         }
         if(this._novaPoll)poll.remove(this._novaPoll);
         this._novaSampleRates=sampleRates;
         this._novaPoll=update;
-        poll.add(update,3);
+        function configurePoll(){
+            epoch++;
+            poll.remove(update);
+            if(epoch>1){prevSample=null;self._novaCpuSample=null;}
+            if(notice)notice.textContent=warnings.join('；')+(enabled()?'。正在自动重试。':'。刷新已暂停，数据可能已过期。');
+            if(enabled()){
+                poll.add(update,prefs.interval);
+                refreshStatus('每 '+prefs.interval+' 秒刷新 · 等待下一次采样');
+            }else refreshStatus(document.hidden?'后台已暂停 · 数据可能已过期':prefs.interval===0?'刷新已暂停 · 数据可能已过期':'卡片已全部隐藏 · 刷新已暂停');
+        }
+        function visibility(){configurePoll();}
+        if(document.addEventListener)document.addEventListener('visibilitychange',visibility);
+        this._novaCleanup=function(){
+            epoch++;
+            poll.remove(update);
+            if(document.removeEventListener)document.removeEventListener('visibilitychange',visibility);
+        };
+        configurePoll();
         return root;
     },
     remove:function(){
+        if(this._novaCleanup)this._novaCleanup();
+        this._novaCleanup=null;
         if(this._novaPoll)poll.remove(this._novaPoll);
         this._novaPoll=null;
         this._novaCpuSample=null;

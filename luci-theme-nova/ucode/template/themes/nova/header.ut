@@ -59,13 +59,16 @@
         <div class="nova-topbar" role="banner">
             <div class="nova-current-page">{{ striptags(_(dispatched?.title ?? 'Dashboard')) }}</div>
             <div class="nova-top-actions">
-                <label class="nova-search-wrap"><span aria-hidden="true">⌕</span><input id="nova-search" type="search" placeholder="搜索菜单 / Search menu" aria-label="搜索菜单"></label>
+                <div class="nova-page-search">
+                    <label class="nova-search-wrap"><span aria-hidden="true">⌕</span><input id="nova-search" type="search" placeholder="搜索页面 / Search pages" aria-label="搜索页面 / Search pages" autocomplete="off" spellcheck="false"></label>
+                </div>
                 <button class="nova-refresh" id="nova-refresh" type="button" title="刷新页面"><span aria-hidden="true">↻</span> 刷新</button>
                 <span class="nova-device"><span class="nova-live-dot">●</span>{{ striptags(boardinfo.hostname ?? '?') }} · {{ striptags(boardinfo.model ?? '') }}</span>
                 <div id="indicators" class="pull-right"></div>
             </div>
         </div>
         <script src="{{ media }}/nova-shell.js"></script>
+        <script src="{{ media }}/nova-search.js"></script>
         <script src="{{ media }}/nova-lists.js"></script>
 
 		<div id="maincontent" class="container">

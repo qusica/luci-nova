@@ -34,8 +34,9 @@ jobs:
           node --check luci-theme-nova/htdocs/luci-static/resources/view/nova/dashboard.js
           node --check luci-theme-nova/htdocs/luci-static/nova/nova-shell.js
           node --check luci-theme-nova/htdocs/luci-static/nova/nova-lists.js
+          node --check luci-theme-nova/htdocs/luci-static/nova/nova-search.js
       - name: Test dashboard rendering
-        run: node --test tests/dashboard.test.js tests/native-lists.test.js tests/navigation.test.js tests/menu-localization.test.js tests/package-integration.test.js
+        run: node --test tests/dashboard.test.js tests/native-lists.test.js tests/navigation.test.js tests/menu-localization.test.js tests/package-integration.test.js tests/page-search.test.js tests/page-search-interaction.test.js
       - name: Test asset cache versions
         env:
           NOVA_ASSET_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
@@ -46,6 +47,10 @@ jobs:
         run: node --test tests/native-lists-browser.test.js
       - name: Test click-only menu interactions in Chrome
         run: node --test tests/navigation-browser.test.js
+      - name: Test Dashboard preferences and refresh lifecycle in Chrome
+        run: node --test tests/dashboard-preferences-browser.test.js
+      - name: Test global page search in Chrome
+        run: node --test tests/page-search-browser.test.js
       - name: Build from matching OpenWrt SDK
         uses: openwrt/gh-action-sdk@f5813d30eeef3534b58ac7e79c5d8842b6035434
         env:

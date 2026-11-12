@@ -182,3 +182,20 @@
  .nova-dashboard .nv-updated{margin-left:26px}
  .nova-dashboard h2{font-size:22px}
 }
+
+/* Browser-local presentation controls. Hidden cards never retain grid space. */
+.nova-dashboard [hidden]{display:none!important}
+.nova-dashboard .nv-controls{display:flex;align-items:center;flex-wrap:wrap;gap:10px 14px;margin:0 0 20px;font-size:12px}
+.nova-dashboard .nv-controls>a{margin-left:auto;color:var(--nv-accent)}
+.nova-dashboard .nv-controls select,.nova-dashboard .nv-reset{background:var(--nv-bg);color:inherit;border:1px solid var(--nv-line);border-radius:7px;padding:7px 10px;font:inherit;min-height:36px}
+.nova-dashboard .nv-disclosure>summary{cursor:pointer;color:var(--nv-accent);padding:10px 18px;font-size:12px;line-height:1.5}
+.nova-dashboard .nv-controls>.nv-disclosure{flex-basis:100%;border:1px solid var(--nv-line);border-radius:9px;background:var(--nv-bg)}
+.nova-dashboard .nv-card-options{display:flex;flex-wrap:wrap;gap:12px 20px;border:0;margin:0;padding:10px 18px}
+.nova-dashboard .nv-card-options legend{font-size:12px;color:var(--nv-dim);padding:0}
+.nova-dashboard .nv-card-options label{display:flex;align-items:center;gap:8px;cursor:pointer;min-height:32px}
+.nova-dashboard .nv-card-options input{accent-color:var(--nv-accent);width:16px;height:16px;margin:0}
+.nova-dashboard .nv-preference-note{display:block;color:var(--nv-dim);padding:0 18px 12px;font-size:11px}
+.nova-dashboard .nv-empty{padding:20px;border:1px dashed var(--nv-line);border-radius:10px;line-height:1.7;color:var(--nv-dim)}
+.nova-dashboard .nv-controls :focus-visible,.nova-dashboard summary:focus-visible{outline:2px solid var(--nv-accent);outline-offset:3px}
+.nova-dashboard .nv-updated{max-width:100%;line-height:1.5;white-space:normal}
+@media(max-width:700px){.nova-dashboard .nv-overview-head{flex-wrap:wrap}.nova-dashboard .nv-controls>a{margin-left:0}.nova-dashboard .nv-title-group{min-width:200px}}

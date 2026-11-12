@@ -68,11 +68,12 @@ test('integrated source blocks legacy ownership without forced replacement or pa
     assert.match(makefile, /^LUCI_DEPENDS:=\+luci-base \+luci-theme-bootstrap$/m);
 });
 
-test('uninstall selects Bootstrap only when removing the active Nova theme, not on upgrade', { skip: !sourceTree }, () => {
+test('uninstall selects Bootstrap only when removing the active Nova theme, not on upgrade', () => {
     const { spawnSync } = require('node:child_process');
     const os = require('node:os');
-    const makefile = fs.readFileSync(makefilePath, 'utf8');
-    const hook = makefile.match(/define Package\/luci-theme-nova\/postrm\n([\s\S]*?)\nendef/)[1].replace(/\$\$/g, '$');
+    const hook = sourceTree ? fs.readFileSync(makefilePath, 'utf8')
+        .match(/define Package\/luci-theme-nova\/postrm\n([\s\S]*?)\nendef/)[1].replace(/\$\$/g, '$') :
+        fs.readFileSync(path.join(root, 'control/luci-theme-nova/postrm'), 'utf8');
     const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'nova-postrm-'));
     try {
         const template = path.join(temporary, 'header.ut');

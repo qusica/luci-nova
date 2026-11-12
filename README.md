@@ -146,9 +146,15 @@ Project-authored files: MIT. Templates adapted from the LuCI Bootstrap theme ret
 - Bundle Dashboard assets, menu, read-only RPC access and Chinese translation
   into `luci-theme-nova`; build and sign only one Nova package per format.
 - Preserve native Overview, every existing status/configuration page, routes and
-  ACL identities. Dashboard data and Nova's palette are unchanged.
+  ACL identities. Nova's palette and complete information remain available.
 - Reject co-installation with the old standalone app. Document a remove-first
   migration for APK/IPK instead of forcing file replacement or editing APK world.
+- Search every accessible native/plugin page by title or parent category from the
+  header. Ctrl/Cmd+K opens the search, including pages inside collapsed menus.
+- Choose visible Dashboard cards and restore the defaults, with preferences
+  stored only in the current browser. Expand radio details when needed.
+- Select 10/30/60-second refresh or pause. Hidden tabs stop polling; hidden charts
+  skip realtime requests. The native Overview remains one click away.
 - Safely fall back to Bootstrap when removing an active Nova theme. Keep another
   selected theme and replacement installs untouched.
 
