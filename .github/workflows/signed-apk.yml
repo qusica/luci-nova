@@ -2,7 +2,7 @@ name: Build signed APK packages
 
 on:
   push:
-    branches: [main]
+    branches: [main, ci/sign-nova-0.3.1-router-test]
     tags: ['v*']
   workflow_dispatch:
 
@@ -127,3 +127,84 @@ jobs:
             ${{ runner.temp }}/nova-release-signed/BUILD-SOURCE.txt
           if-no-files-found: error
           retention-days: 30
+
+  development-test-once:
+    # Owner-approved exact 0.3.1 artifact only; production gates stay unchanged.
+    if: github.repository == 'qusica/luci-nova' && github.event_name == 'push' && github.ref == 'refs/heads/ci/sign-nova-0.3.1-router-test' && github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - name: Checkout reviewed one-time guard only
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+          path: guard
+          sparse-checkout: |
+            .github/workflows/signed-apk.yml
+            scripts/prepare-development-signing.py
+            tests/development-signing.test.py
+          sparse-checkout-cone-mode: false
+      - name: Test one-time guard without secrets
+        run: python3 guard/tests/development-signing.test.py
+      - name: Validate successful source run and exact pinned unsigned artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 guard/scripts/prepare-development-signing.py "$RUNNER_TEMP/nova-development-input"
+      - name: Checkout independently reviewed single-package signing scripts
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: d787e4140993a5f1117bbb11b1ca553a1b2781c6
+          persist-credentials: false
+          path: trusted
+          sparse-checkout: |
+            scripts/build-host-apk.sh
+            scripts/sign-release-apks.sh
+            scripts/sign-apks.sh
+          sparse-checkout-cone-mode: false
+      - name: Verify reviewed signing scripts before loading any secret
+        run: |
+          cd trusted
+          test "$(git rev-parse HEAD)" = d787e4140993a5f1117bbb11b1ca553a1b2781c6
+          test "$(git hash-object scripts/build-host-apk.sh)" = a63a5f54285e78cffa711c3ee9b6edee3094da8a
+          test "$(git hash-object scripts/sign-release-apks.sh)" = 666143efc3b203c5e050a4095b6ae65bf7ae3458
+          test "$(git hash-object scripts/sign-apks.sh)" = 541ace61d0af066e8984903db9ba227d67814ac1
+      - name: Install signing tool build dependencies before loading secrets
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends build-essential meson ninja-build pkg-config libssl-dev zlib1g-dev libzstd-dev
+      - name: Build trusted pinned and checksummed APK tool without signing secret
+        run: bash trusted/scripts/build-host-apk.sh "$RUNNER_TEMP/nova-host-apk"
+      - name: Sign exact development package and strictly verify existing trust
+        shell: bash
+        env:
+          NOVA_APK_SIGNING_KEY: ${{ secrets.NOVA_APK_SIGNING_KEY }}
+          NOVA_APK_SIGNING_PUBLIC_KEY_SHA256: 1475de2470b41a6c99263996ebc44b393bdf385d3639991514563d5c89054140
+        run: |
+          set +x
+          set -euo pipefail
+          cd "$RUNNER_TEMP/nova-development-input"
+          printf '%s  %s\n' 35b21eb85dc245092f673fa5a4211a05ddefff2c5ad3d47eba4accba117e464f luci-theme-nova-0.3.1-r1.apk | sha256sum -c -
+          bash "$GITHUB_WORKSPACE/trusted/scripts/sign-release-apks.sh" "$RUNNER_TEMP/nova-host-apk/build/src/apk" \
+            "$RUNNER_TEMP/nova-development-input/luci-theme-nova-0.3.1-r1.apk" \
+            "$RUNNER_TEMP/nova-development-signed"
+      - name: Add development provenance and checksum it
+        run: |
+          cp "$RUNNER_TEMP/nova-development-input/BUILD-SOURCE.json" "$RUNNER_TEMP/nova-development-signed/BUILD-SOURCE.json"
+          cd "$RUNNER_TEMP/nova-development-signed"
+          sha256sum BUILD-SOURCE.json PUBLIC-KEY-SHA256.txt >> SHA256SUMS
+      - name: Upload DEVELOPMENT-TEST package and public material only
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: DEVELOPMENT-TEST-luci-nova-0.3.1-r1-5c85f78adcc4
+          path: |
+            ${{ runner.temp }}/nova-development-signed/luci-theme-nova-0.3.1-r1.apk
+            ${{ runner.temp }}/nova-development-signed/nova-signing-public.pem
+            ${{ runner.temp }}/nova-development-signed/PUBLIC-KEY-SHA256.txt
+            ${{ runner.temp }}/nova-development-signed/SHA256SUMS
+            ${{ runner.temp }}/nova-development-signed/BUILD-SOURCE.json
+          if-no-files-found: error
+          retention-days: 7
+
